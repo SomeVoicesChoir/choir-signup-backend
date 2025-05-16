@@ -35,11 +35,7 @@ export default async function handler(req, res) {
       const firstName = record.fields['First Name'] || null;
       const surname = record.fields['Surname'] || null;
       const latestChoir = record.fields['LATEST CHOIR (conc)'] || null;
-
-      let voicePart = null;
-      if (Array.isArray(record.fields['Voice Part']) && record.fields['Voice Part'].length > 0) {
-        voicePart = { id: record.fields['Voice Part'][0] };
-      }
+      const voicePart = record.fields['Voice Part'] || null; // just return the string
 
       res.status(200).json({ found: true, firstName, surname, latestChoir, voicePart });
     } else {
