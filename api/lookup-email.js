@@ -8,7 +8,9 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -28,15 +30,16 @@ export default async function handler(req, res) {
       })
       .firstPage();
 
-    if (records.length > 0) {
-      const record = records[0];
-      const fullName = record.fields['Name'] || null;
-      const firstName = record.fields['First Name'] || null;
-
-      res.status(200).json({ found: true, fullName, firstName });
-    } else {
-      res.status(200).json({ found: false });
-    }
+      if (records.length > 0) {
+        const record = records[0];
+        const fullName = record.fields['Full Name'] || null;
+        const firstName = record.fields['First Name'] || null;
+        const latestChoir = record.fields['LATEST CHOIR (conc)'] || null;
+      
+        res.status(200).json({ found: true, fullName, firstName, latestChoir });
+      } else {
+        res.status(200).json({ found: false });
+      }
   } catch (err) {
     console.error('Airtable error:', err);
     res.status(500).json({ error: 'Internal Server Error' });
