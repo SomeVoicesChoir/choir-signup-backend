@@ -33,10 +33,10 @@ export default async function handler(req, res) {
 
     if (records.length > 0) {
       const record = records[0];
-      const fullName = record.fields['Full Name'] || null;
+      const fullName = record.fields['Name'] || null; // ✅ Updated to use {Name} field
       res.status(200).json({ found: true, fullName });
     } else {
-      res.status(200).json({ found: false });
+      res.status(200).json({ found: false, fullName: null });
     }
   } catch (err) {
     console.error('Airtable error:', err);
