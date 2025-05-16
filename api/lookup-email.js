@@ -32,17 +32,16 @@ export default async function handler(req, res) {
 
     if (records.length > 0) {
       const record = records[0];
-      const fullName = record.fields['Full Name'] || null;
       const firstName = record.fields['First Name'] || null;
+      const surname = record.fields['Surname'] || null;
       const latestChoir = record.fields['LATEST CHOIR (conc)'] || null;
 
-      // voicePart is linked record(s), get the first linked record ID or null
       let voicePart = null;
       if (Array.isArray(record.fields['Voice Part']) && record.fields['Voice Part'].length > 0) {
-        voicePart = { id: record.fields['Voice Part'][0] }; // just the ID for select matching
+        voicePart = { id: record.fields['Voice Part'][0] };
       }
 
-      res.status(200).json({ found: true, fullName, firstName, latestChoir, voicePart });
+      res.status(200).json({ found: true, firstName, surname, latestChoir, voicePart });
     } else {
       res.status(200).json({ found: false });
     }
