@@ -8,15 +8,16 @@ export default async function handler(req, res) {
       .select({
         view: 'Choir CURRENT (SqSp Signup)'
       })
-      .firstPage();
+      .all();
 
     const choirs = records.map(record => ({
       id: record.id,
-      fields: record.fields,
+      name: record.get('Name')
     }));
 
     res.status(200).json({ records: choirs });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error fetching choirs:', error);
+    res.status(500).json({ error: 'Failed to fetch choirs' });
   }
 }
