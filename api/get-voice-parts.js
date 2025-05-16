@@ -15,12 +15,12 @@ export default async function handler(req, res) {
 
   try {
     const records = await base('Voice Parts')
-      .select({ fields: ['Name'], view: 'Grid view' })
+      .select({ fields: ['Voice Part'], view: 'Voice Parts' })
       .firstPage();
 
     const voiceParts = records.map(record => ({
       id: record.id,
-      name: record.fields['Name'],
+      name: record.fields['Voice Part'],
     }));
 
     res.status(200).json({ voiceParts });
