@@ -30,16 +30,22 @@ export default async function handler(req, res) {
       })
       .firstPage();
 
-      if (records.length > 0) {
-        const record = records[0];
-        const fullName = record.fields['Full Name'] || null;
-        const firstName = record.fields['First Name'] || null;
-        const latestChoir = record.fields['LATEST CHOIR (conc)'] || null;
-      
-        res.status(200).json({ found: true, fullName, firstName, latestChoir });
-      } else {
-        res.status(200).json({ found: false });
+    if (records.length > 0) {
+      const record = records[0];
+      const fullName = record.fields['Full Name'] || null;
+      const firstName = record.fields['First Name'] || null;
+      const latestChoir = record.fields['LATEST CHOIR (conc)'] || null;
+
+      // voicePart is linked record(s), get the first linked record ID or null
+      let voicePart = null;
+      if (Array.isArray(record.fields['Voice Part']) && record.fields['Voice Part'].length > 0) {
+        voicePart = { id: record.fields['Voice Part'][0] }; // just the ID for select matching
       }
+
+      res.status(200).json({ found: true, fullName, firstName, latestChoir, voicePart });
+    } else {
+      res.status(200).json({ found: false });
+    }
   } catch (err) {
     console.error('Airtable error:', err);
     res.status(500).json({ error: 'Internal Server Error' });
