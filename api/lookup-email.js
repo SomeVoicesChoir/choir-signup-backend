@@ -36,8 +36,9 @@ export default async function handler(req, res) {
       const surname = record.fields['Surname'] || null;
       const latestChoir = record.fields['LATEST CHOIR (conc)'] || null;
       const voicePart = record.fields['Voice Part'] || null; // just return the string
+      const customerRecord = record.fields['*Customer Record'] || null; // linked record ID(s)
 
-      res.status(200).json({ found: true, firstName, surname, latestChoir, voicePart });
+      res.status(200).json({ found: true, firstName, surname, latestChoir, voicePart, customerRecord });
     } else {
       res.status(200).json({ found: false });
     }
