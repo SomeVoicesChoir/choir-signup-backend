@@ -4,7 +4,7 @@ import Airtable from 'airtable';
 const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);
 
 export default async function handler(req, res) {
-  // ✅ Allow requests from any origin (or change '*' to your Squarespace domain)
+  // ✅ Allow requests from any origin (or restrict to Squarespace domain)
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -16,18 +16,21 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Fetch records from the 'Choirs MASTER' table, using the correct view
+    // Fetch records from the correct view of the Choirs MASTER table
     const records = await base('Choirs MASTER')
       .select({ view: 'Choir CURRENT (SqSp Signup)' })
       .all();
 
-    // Format the choir records
+    // Format and return each choir record with all required fields
     const choirs = records.map(record => ({
       id: record.id,
       name: record.get('Name'),
+      priceId: record.get('Stripe PRICE_ID') || null,
+      unitAmount: record.get("Stripe 'default_price_data[unit_amount]'") || null,
+      chartCode: record.get('Chart of Accounts Code') || null,
+      chartFull: record.get('Chart of Accounts Full Length') || null
     }));
 
-    // Return the list of choirs
     res.status(200).json({ records: choirs });
   } catch (error) {
     console.error('Airtable fetch error:', error);
