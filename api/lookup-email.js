@@ -30,18 +30,37 @@ export default async function handler(req, res) {
       })
       .firstPage();
 
-    if (records.length > 0) {
-      const record = records[0];
-      const firstName = record.fields['First Name'] || null;
-      const surname = record.fields['Surname'] || null;
-      const latestChoir = record.fields['LATEST CHOIR (conc)'] || null;
-      const voicePart = record.fields['Voice Part'] || null; // just return the string
-      const customerRecord = record.fields['*Customer Record'] || null; // linked record ID(s)
-
-      res.status(200).json({ found: true, firstName, surname, latestChoir, voicePart, customerRecord });
-    } else {
-      res.status(200).json({ found: false });
+    if (records.length === 0) {
+      return res.status(200).json({ found: false });
     }
+
+    const record = records[0];
+    const firstName = record.fields['First Name'] || null;
+    const surname = record.fields['Surname'] || null;
+    const latestChoir = record.fields['LATEST CHOIR (conc)'] || null;
+    const voicePart = record.fields['Voice Part'] || null;
+
+    let stripeCustomerId = null;
+    let stripeSubscriptionId = null;
+
+    const customerLinks = record.fields['*Customer Record'] || [];
+    if (customerLinks.length > 0) {
+      const customerRecordId = customerLinks[0];
+      const customerRecord = await base('Customer Record').find(customerRecordId);
+      stripeCustomerId = customerRecord.fields['Stripe Customer_ID'] || null;
+      stripeSubscriptionId = customerRecord.fields['Stripe Subscription_ID'] || null;
+    }
+
+    res.status(200).json({
+      found: true,
+      firstName,
+      surname,
+      latestChoir,
+      voicePart,
+      stripeCustomerId,
+      stripeSubscriptionId
+    });
+
   } catch (err) {
     console.error('Airtable error:', err);
     res.status(500).json({ error: 'Internal Server Error' });
