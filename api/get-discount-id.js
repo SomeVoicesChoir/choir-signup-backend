@@ -15,9 +15,11 @@ export default async function handler(req, res) {
   if (!code) return res.status(400).json({ error: 'No discount code provided' });
 
   try {
+    const cleanedCode = code.trim().toLowerCase();
+
     const records = await base('Discount Codes')
       .select({
-        filterByFormula: `{Discount Code} = '${code}'`,
+        filterByFormula: `LOWER(TRIM({Discount Code})) = '${cleanedCode}'`,
         maxRecords: 1,
       })
       .firstPage();
