@@ -34,12 +34,12 @@ export default async function handler(req, res) {
       'First Name': firstName || '',
       'Surname': surname || '',
       'Email': email || '',
-      'Choir': choir ? [choir] : [], // now correct: linked record by ID
+      'Choir': choir ? [choir] : undefined, // record ID array
       'Voice Part': voicePart || '',
       'Billing Anchor': billingAnchor || '',
       'Stripe Customer ID': stripeCustomerId || '',
       'Stripe Subscription ID': stripeSubscriptionId || '',
-      'Discount Code': discountCode ? [discountCode] : undefined // safer than []
+      'Discount Code': discountCode && discountCode.length > 0 ? discountCode : undefined // record ID array
     });
 
     res.status(200).json({ success: true, recordId: airtableRecord.id });
