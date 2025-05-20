@@ -34,7 +34,7 @@ export default async function handler(req, res) {
       'First Name': firstName || '',
       'Surname': surname || '',
       'Email': email || '',
-      'Choir': [choir], // linked record by name
+      'Choir': choir ? [choir] : [], // now correct: linked record by ID
       'Voice Part': voicePart || '',
       'Billing Anchor': billingAnchor || '',
       'Stripe Customer ID': stripeCustomerId || '',
