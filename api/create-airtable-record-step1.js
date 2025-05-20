@@ -39,7 +39,7 @@ export default async function handler(req, res) {
       'Billing Anchor': billingAnchor || '',
       'Stripe Customer ID': stripeCustomerId || '',
       'Stripe Subscription ID': stripeSubscriptionId || '',
-      'Discount Code': discountCode ? [discountCode] : [] // linked record by name
+      'Discount Code': discountCode ? [discountCode] : undefined // safer than []
     });
 
     res.status(200).json({ success: true, recordId: airtableRecord.id });
