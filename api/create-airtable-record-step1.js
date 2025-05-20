@@ -8,6 +8,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
+  // Preflight request
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -17,38 +18,33 @@ export default async function handler(req, res) {
   }
 
   const {
-    email,
     firstName,
     surname,
+    email,
     choir,
     voicePart,
-    chartCode,
-    chartDescription,
-    discountCode,
+    billingAnchor,
     stripeCustomerId,
     stripeSubscriptionId,
-    billingAnchor
+    discountCode
   } = req.body;
 
   try {
-    const record = await base('Signup Queue').create({
-      'Email': email,
-      'First Name': firstName,
-      'Surname': surname,
-      'Choir': choir,
-      'Voice Part': voicePart,
-      'Chart Code': chartCode,
-      'Chart Description': chartDescription,
-      'Discount Code': discountCode || '',
-      'Stripe Customer_ID': stripeCustomerId || '',
-      'Stripe Subscription_ID': stripeSubscriptionId || '',
+    const airtableRecord = await base('Signup Queue').create({
+      'First Name': firstName || '',
+      'Surname': surname || '',
+      'Email': email || '',
+      'Choir': [choir], // linked record by name
+      'Voice Part': voicePart || '',
       'Billing Anchor': billingAnchor || '',
-      'Status': 'Pending'
+      'Stripe Customer ID': stripeCustomerId || '',
+      'Stripe Subscription ID': stripeSubscriptionId || '',
+      'Discount Code': discountCode ? [discountCode] : [] // linked record by name
     });
 
-    res.status(200).json({ success: true, recordId: record.id });
+    res.status(200).json({ success: true, recordId: airtableRecord.id });
   } catch (error) {
     console.error('Airtable error:', error);
-    res.status(500).json({ error: 'Failed to create Airtable record' });
+    res.status(500).json({ error: 'Failed to create record in Airtable' });
   }
 }
