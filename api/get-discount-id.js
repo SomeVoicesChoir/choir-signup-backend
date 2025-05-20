@@ -17,7 +17,7 @@ export default async function handler(req, res) {
   try {
     const records = await base('Discount Codes')
       .select({
-        filterByFormula: `{Name} = '${code}'`,
+        filterByFormula: `{Discount Code} = '${code}'`,
         maxRecords: 1,
       })
       .firstPage();
