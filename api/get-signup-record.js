@@ -11,20 +11,25 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   const { recordId } = req.query;
-
   if (!recordId) return res.status(400).json({ error: 'Missing recordId' });
 
   try {
     const record = await base('Signup Queue').find(recordId);
-    const totalCost = record.fields['Total Cost Initial Invoice'];
 
-    if (!totalCost) {
+    const rawAmount = record.fields['Total Cost Initial Invoice'];
+    const rawDescription = record.fields['Initial Payment Description'];
+
+    const amount = Array.isArray(rawAmount) ? Number(rawAmount[0]) : Number(rawAmount);
+    const description = Array.isArray(rawDescription) ? rawDescription[0] : rawDescription;
+
+    if (!amount || isNaN(amount)) {
       return res.status(202).json({ ready: false }); // Still calculating
     }
 
     return res.status(200).json({
       ready: true,
-      amount: totalCost,
+      amount,
+      description: description || '',
       email: record.fields['Email'],
       metadata: {
         choir: record.fields['Choir']?.[0] || '',
@@ -33,8 +38,7 @@ export default async function handler(req, res) {
         surname: record.fields['Surname'] || '',
         chartCode: record.fields['Chart of Accounts Code']?.[0] || '',
         chartDescription: record.fields['Chart of Accounts Full Length']?.[0] || ''
-      },
-      initialPaymentDescription: record.fields['Initial Payment Description'] || ''
+      }
     });
   } catch (err) {
     console.error('Airtable fetch error:', err);
