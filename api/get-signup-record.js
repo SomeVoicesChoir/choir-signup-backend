@@ -16,7 +16,6 @@ export default async function handler(req, res) {
 
   try {
     const record = await base('Signup Queue').find(recordId);
-
     const totalCost = record.fields['Total Cost Initial Invoice'];
 
     if (!totalCost) {
@@ -32,9 +31,10 @@ export default async function handler(req, res) {
         voicePart: record.fields['Voice Part'] || '',
         firstName: record.fields['First Name'] || '',
         surname: record.fields['Surname'] || '',
-        chartCode: record.fields['Chart of Accounts Code'] || '',
-        chartDescription: record.fields['Chart of Accounts Full Length'] || ''
-      }
+        chartCode: record.fields['Chart of Accounts Code']?.[0] || '',
+        chartDescription: record.fields['Chart of Accounts Full Length']?.[0] || ''
+      },
+      initialPaymentDescription: record.fields['Initial Payment Description'] || ''
     });
   } catch (err) {
     console.error('Airtable fetch error:', err);
