@@ -9,13 +9,8 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   // Preflight request
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const {
     firstName,
@@ -26,7 +21,8 @@ export default async function handler(req, res) {
     billingAnchor,
     stripeCustomerId,
     stripeSubscriptionId,
-    discountCode
+    discountCode,
+    existingMemberRecordId // ✅ <-- NEW field
   } = req.body;
 
   try {
@@ -34,12 +30,13 @@ export default async function handler(req, res) {
       'First Name': firstName || '',
       'Surname': surname || '',
       'Email': email || '',
-      'Choir': choir ? [choir] : undefined, // record ID array
+      'Choir': choir ? [choir] : undefined,
       'Voice Part': voicePart || '',
       'Billing Anchor': billingAnchor || '',
       'Stripe Customer ID': stripeCustomerId || '',
       'Stripe Subscription ID': stripeSubscriptionId || '',
-      'Discount Code': discountCode && discountCode.length > 0 ? discountCode : undefined // record ID array
+      'Discount Code': discountCode && discountCode.length > 0 ? discountCode : undefined,
+      'Existing Member Record ID': existingMemberRecordId ? [existingMemberRecordId] : undefined // ✅ <-- ADDED
     });
 
     res.status(200).json({ success: true, recordId: airtableRecord.id });
