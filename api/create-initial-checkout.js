@@ -1,6 +1,8 @@
 import Stripe from 'stripe';
+import Airtable from 'airtable';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -10,13 +12,30 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { email, amount, metadata } = req.body;
+  const { recordId, amount } = req.body;
 
-  if (!email || !amount) {
-    return res.status(400).json({ error: 'Missing email or amount' });
+  if (!recordId || !amount) {
+    return res.status(400).json({ error: 'Missing recordId or amount' });
   }
 
   try {
+    // Fetch the Airtable record using the recordId
+    const record = await base('Signup Queue').find(recordId);
+
+    const email = record.get('Email');
+    const metadata = {
+      choir: record.get('Choir')?.[0] || '',
+      voicePart: record.get('Voice Part') || '',
+      firstName: record.get('First Name') || '',
+      surname: record.get('Surname') || '',
+      chartCode: record.get("Chart of Accounts Code") || '',
+      chartDescription: record.get("Chart of Accounts Full Length") || ''
+    };
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email not found in Airtable record' });
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],
@@ -25,7 +44,7 @@ export default async function handler(req, res) {
         {
           price_data: {
             currency: 'gbp',
-            unit_amount: Math.round(parseFloat(amount) * 100), // convert to pence
+            unit_amount: Number(amount), // already in pence
             product_data: {
               name: 'Some Voices – Initial Pro-Rata Payment'
             }
