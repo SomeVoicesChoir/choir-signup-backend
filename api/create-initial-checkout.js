@@ -19,30 +19,19 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Fetch the Airtable record using the recordId
     const record = await base('Signup Queue').find(recordId);
+    const email = record.fields['Email'];
 
-    const email = record.get('Email');
+    const description = record.fields['Initial Payment Description'] || 'Some Voices – Initial Pro-Rata Payment';
+
     const metadata = {
-        choir: String(record.get('Choir')?.[0] || ''),
-        voicePart: String(record.get('Voice Part') || ''),
-        firstName: String(record.get('First Name') || ''),
-        surname: String(record.get('Surname') || ''),
-        chartCode: String(
-          Array.isArray(record.get('Chart of Accounts Code'))
-            ? record.get('Chart of Accounts Code')[0]
-            : record.get('Chart of Accounts Code') || ''
-        ),
-        chartDescription: String(
-          Array.isArray(record.get('Chart of Accounts Full Length'))
-            ? record.get('Chart of Accounts Full Length')[0]
-            : record.get('Chart of Accounts Full Length') || ''
-        )
-      };
-
-    if (!email) {
-      return res.status(400).json({ error: 'Email not found in Airtable record' });
-    }
+      choir: record.fields['Choir']?.[0] || '',
+      voicePart: record.fields['Voice Part'] || '',
+      firstName: record.fields['First Name'] || '',
+      surname: record.fields['Surname'] || '',
+      chartCode: (record.fields['Chart of Accounts Code'] || [])[0] || '',
+      chartDescription: (record.fields['Chart of Accounts Full Length'] || [])[0] || ''
+    };
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
@@ -52,9 +41,9 @@ export default async function handler(req, res) {
         {
           price_data: {
             currency: 'gbp',
-            unit_amount: Number(amount), // already in pence
+            unit_amount: Number(amount),
             product_data: {
-              name: 'Some Voices – Initial Pro-Rata Payment'
+              name: description
             }
           },
           quantity: 1
@@ -65,7 +54,7 @@ export default async function handler(req, res) {
       cancel_url: 'https://somevoices.co.uk/cancelled'
     });
 
-    res.status(200).json({ url: session.url });
+    res.status(200).json({ url: session.url });git
   } catch (error) {
     console.error('Stripe error:', error);
     res.status(500).json({ error: 'Failed to create checkout session' });
