@@ -24,13 +24,21 @@ export default async function handler(req, res) {
 
     const email = record.get('Email');
     const metadata = {
-      choir: record.get('Choir')?.[0] || '',
-      voicePart: record.get('Voice Part') || '',
-      firstName: record.get('First Name') || '',
-      surname: record.get('Surname') || '',
-      chartCode: record.get("Chart of Accounts Code") || '',
-      chartDescription: record.get("Chart of Accounts Full Length") || ''
-    };
+        choir: String(record.get('Choir')?.[0] || ''),
+        voicePart: String(record.get('Voice Part') || ''),
+        firstName: String(record.get('First Name') || ''),
+        surname: String(record.get('Surname') || ''),
+        chartCode: String(
+          Array.isArray(record.get('Chart of Accounts Code'))
+            ? record.get('Chart of Accounts Code')[0]
+            : record.get('Chart of Accounts Code') || ''
+        ),
+        chartDescription: String(
+          Array.isArray(record.get('Chart of Accounts Full Length'))
+            ? record.get('Chart of Accounts Full Length')[0]
+            : record.get('Chart of Accounts Full Length') || ''
+        )
+      };
 
     if (!email) {
       return res.status(400).json({ error: 'Email not found in Airtable record' });
