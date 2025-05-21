@@ -22,7 +22,7 @@ export default async function handler(req, res) {
     stripeCustomerId,
     stripeSubscriptionId,
     discountCode,
-    existingMemberRecordId // ✅ <-- NEW field
+    existingMemberRecordId // ✅ plain text field
   } = req.body;
 
   try {
@@ -36,7 +36,7 @@ export default async function handler(req, res) {
       'Stripe Customer ID': stripeCustomerId || '',
       'Stripe Subscription ID': stripeSubscriptionId || '',
       'Discount Code': discountCode && discountCode.length > 0 ? discountCode : undefined,
-      'Existing Member Record ID': existingMemberRecordId ? [existingMemberRecordId] : undefined // ✅ <-- ADDED
+      'Existing Member Record ID': existingMemberRecordId || '' // ✅ store as plain string
     });
 
     res.status(200).json({ success: true, recordId: airtableRecord.id });
