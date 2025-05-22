@@ -22,14 +22,26 @@ export default async function handler(req, res) {
       .all();
 
     // Format and return each choir record with all required fields
-    const choirs = records.map(record => ({
-      id: record.id,
-      name: record.get('Name'),
-      priceId: record.get('Stripe PRICE_ID') || null,
-      unitAmount: record.get("Stripe 'default_price_data[unit_amount]'") || null,
-      chartCode: record.get('Chart of Accounts Code') || null,
-      chartFull: record.get('Chart of Accounts Full Length') || null
-    }));
+    const choirs = records.map(record => {
+      // Currency might be an array if it's a lookup field
+      let currencyRaw = record.get("Stripe 'default_price_data[currency]'");
+      let currency = '';
+      if (Array.isArray(currencyRaw)) {
+        currency = (currencyRaw[0] || '').toLowerCase();
+      } else {
+        currency = (currencyRaw || '').toLowerCase();
+      }
+
+      return {
+        id: record.id,
+        name: record.get('Name'),
+        priceId: record.get('Stripe PRICE_ID') || null,
+        unitAmount: record.get("Stripe 'default_price_data[unit_amount]'") || null,
+        chartCode: record.get('Chart of Accounts Code') || null,
+        chartFull: record.get('Chart of Accounts Full Length') || null,
+        currency: currency || null
+      };
+    });
 
     res.status(200).json({ records: choirs });
   } catch (error) {
