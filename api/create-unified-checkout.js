@@ -20,6 +20,8 @@ export default async function handler(req, res) {
 
     const email = record.fields['Email'];
     const rawPriceId = record.fields['Stripe PRICE_ID'];
+
+    // Clean up Stripe price ID for subscription
     let priceId = '';
     if (typeof rawPriceId === 'string') {
       priceId = rawPriceId;
@@ -35,7 +37,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid Stripe PRICE_ID format' });
     }
 
-    // Currency logic
+    // Currency and field handling
     const currencyField = record.fields["Stripe 'default_price_data[currency]'"] || 'gbp';
     const currency = typeof currencyField === 'string'
       ? currencyField.toLowerCase()
@@ -43,11 +45,11 @@ export default async function handler(req, res) {
         ? currencyField[0].toLowerCase()
         : 'gbp';
 
-    // Amount and description for pro-rata
+    // Pro-rata amount for one-off charge
     const amount = Number((record.fields['Total Cost Initial Invoice'] || [])[0] || 0);
     const description = (record.fields['Initial Payment Description'] || [])[0] || 'Some Voices – Initial Payment';
 
-    // Coupon (should be the Stripe Coupon ID, e.g., "CDT90OsN")
+    // Coupon (must be a Stripe Coupon ID)
     const couponId = (record.fields['Stripe Coupon ID'] || [])[0] || null;
 
     const customerId = record.fields['Stripe Customer ID'] || null;
@@ -70,12 +72,12 @@ export default async function handler(req, res) {
     }
     const trialEndUnix = Math.floor(trialEndDate.getTime() / 1000);
 
-    // Build line_items depending on currency
+    // Build line_items array based on currency
     let line_items = [];
     if (currency === 'gbp') {
-      // Card flow: custom pro-rata + recurring
-      line_items = [
-        {
+      // Card flow: add one-off pro-rata and subscription
+      if (amount > 0) {
+        line_items.push({
           price_data: {
             currency: 'gbp',
             unit_amount: amount,
@@ -84,14 +86,14 @@ export default async function handler(req, res) {
             }
           },
           quantity: 1
-        },
-        {
-          price: priceId,
-          quantity: 1
-        }
-      ];
+        });
+      }
+      line_items.push({
+        price: priceId,
+        quantity: 1
+      });
     } else if (currency === 'eur') {
-      // SEPA/iDEAL flow: only recurring sub
+      // EUR (SEPA/iDEAL): only recurring, no one-off allowed
       line_items = [
         {
           price: priceId,
@@ -99,9 +101,9 @@ export default async function handler(req, res) {
         }
       ];
     } else {
-      // Default/fallback to card flow
-      line_items = [
-        {
+      // Fallback: treat as GBP/card
+      if (amount > 0) {
+        line_items.push({
           price_data: {
             currency: currency,
             unit_amount: amount,
@@ -110,12 +112,12 @@ export default async function handler(req, res) {
             }
           },
           quantity: 1
-        },
-        {
-          price: priceId,
-          quantity: 1
-        }
-      ];
+        });
+      }
+      line_items.push({
+        price: priceId,
+        quantity: 1
+      });
     }
 
     // Payment method types
@@ -124,16 +126,13 @@ export default async function handler(req, res) {
       payment_method_types = ['card', 'ideal', 'sepa_debit'];
     }
 
-    // Prepare discounts (only for the subscription, not the initial one-off)
+    // Discounts only apply to the subscription part
     let discounts = undefined;
-    if (couponId && currency === 'eur') {
-      discounts = [{ coupon: couponId }];
-    } else if (couponId && currency === 'gbp') {
-      // Card: coupon applies to subscription part only
+    if (couponId) {
       discounts = [{ coupon: couponId }];
     }
 
-    // Build session
+    // Create Stripe Checkout session
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer: customerId || undefined,
