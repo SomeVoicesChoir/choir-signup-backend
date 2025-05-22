@@ -39,8 +39,26 @@ export default async function handler(req, res) {
     }
 
     // Get one-off initial payment amount (pro-rata)
-    const initialAmount = Number((record.fields['Month 1 Initial Cost (from Choir)'] || [])[0] || 0); // << CHANGE FIELD IF NEEDED
-    const initialDesc = (record.fields['Initial Payment Description'] || [])[0] || 'Some Voices – Initial Pro-Rata Payment';
+    const initialAmount = Number(record.fields['Month 1 Initial Cost (from Choir)'] || 0);
+const initialDesc = record.fields['Initial Payment Description'] || 'Some Voices – Initial Pro-Rata Payment';
+console.log('Initial Amount:', initialAmount, 'Initial Desc:', initialDesc);
+
+let line_items = [
+  {
+    price_data: {
+      currency: 'gbp',
+      unit_amount: initialAmount,
+      product_data: {
+        name: initialDesc
+      }
+    },
+    quantity: 1
+  },
+  {
+    price: priceId,
+    quantity: 1
+  }
+];
 
     // Subscription description/metadata
     const chartCode = (record.fields['Chart of Accounts Code'] || [])[0] || '';
@@ -58,6 +76,9 @@ export default async function handler(req, res) {
       chartCode,
       chartDescription
     };
+
+// add log for initial payment
+console.log('Initial Amount:', initialAmount, 'Initial Desc:', initialDesc);
 
     // Build line_items array: initial one-off and recurring sub
     let line_items = [
