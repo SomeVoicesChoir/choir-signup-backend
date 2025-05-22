@@ -78,7 +78,8 @@ let line_items = [
     };
 
 // add log for initial payment
-console.log('Initial Amount:', initialAmount, 'Initial Desc:', initialDesc);
+console.log('Airtable Field {Total Cost Initial Invoice}:', record.fields['Total Cost Initial Invoice']);
+
 
     // Build line_items array: initial one-off and recurring sub
     let line_items = [
