@@ -19,15 +19,24 @@ export default async function handler(req, res) {
     const record = await base('Signup Queue').find(recordId);
 
     const email = record.fields['Email'];
-    let rawPriceId = record.fields['Stripe PRICE_ID'];
-    const priceId =
-      typeof rawPriceId === 'string'
-        ? rawPriceId
-        : Array.isArray(rawPriceId)
-        ? rawPriceId[0]
-        : typeof rawPriceId === 'object'
-        ? Object.values(rawPriceId)[0]
-        : '';
+    const rawPriceId = record.fields['Stripe PRICE_ID'];
+
+    // Strict sanitization for Stripe PRICE_ID
+    let priceId = '';
+    if (typeof rawPriceId === 'string') {
+      priceId = rawPriceId;
+    } else if (Array.isArray(rawPriceId)) {
+      priceId = rawPriceId[0];
+    } else if (rawPriceId && typeof rawPriceId === 'object') {
+      const values = Object.values(rawPriceId);
+      if (values.length && typeof values[0] === 'string') {
+        priceId = values[0];
+      }
+    }
+
+    if (!priceId || typeof priceId !== 'string') {
+      return res.status(400).json({ error: 'Invalid Stripe PRICE_ID format' });
+    }
 
     const amount = Number((record.fields['Total Cost Initial Invoice'] || [])[0] || 0);
     const chartCode = (record.fields['Chart of Accounts Code'] || [])[0] || '';
