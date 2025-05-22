@@ -1,17 +1,8 @@
 import Stripe from 'stripe';
 import Airtable from 'airtable';
-import dayjs from 'dayjs';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);
-
-function calculateTrialEnd(billingAnchor) {
-  const today = dayjs();
-  const nextMonth = today.add(1, 'month');
-  const targetDay = parseInt(billingAnchor, 10);
-  const trialDate = nextMonth.date(targetDay).hour(0).minute(0).second(0);
-  return Math.floor(trialDate.valueOf() / 1000); // UNIX timestamp
-}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -29,32 +20,40 @@ export default async function handler(req, res) {
 
     const email = record.fields['Email'];
     const priceId = record.fields['Stripe PRICE_ID'];
-    const unitAmount = record.fields['Total Cost Initial Invoice'];
-    const description = (record.fields['Initial Payment Description'] || 'Initial Membership Fee').toString();
-    const billingAnchor = record.fields['Billing Anchor'];
-    const discountId = (record.fields['Discount Code'] || [])[0];
+    const amount = Number((record.fields['Total Cost Initial Invoice'] || [])[0] || 0);
+    const chartCode = (record.fields['Chart of Accounts Code'] || [])[0] || '';
+    const chartDescription = (record.fields['Chart of Accounts Full Length'] || [])[0] || '';
+    const description = (record.fields['Initial Payment Description'] || [])[0] || 'Some Voices – Initial Payment';
+    const discountCode = (record.fields['Discount Code'] || [])[0];
+    const customerId = record.fields['Stripe Customer ID'] || null;
+    const billingAnchor = Number(record.fields['Billing Anchor'] || 1);
 
-    const metadata = {
-      choir: record.fields['Choir']?.[0] || '',
-      voicePart: record.fields['Voice Part'] || '',
-      firstName: record.fields['First Name'] || '',
-      surname: record.fields['Surname'] || '',
-      chartCode: (record.fields['Chart of Accounts Code'] || [])[0] || '',
-      chartDescription: (record.fields['Chart of Accounts Full Length'] || [])[0] || '',
-      existingMemberId: record.fields['Existing Member Record ID'] || ''
-    };
+    // Determine trial end (next 1st or 15th)
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+    const nowDay = today.getDate();
 
-    const trialEnd = calculateTrialEnd(billingAnchor);
+    let trialEndDate;
+    if (billingAnchor === 1 && nowDay >= 15) {
+      trialEndDate = new Date(currentYear, currentMonth + 1, 1);
+    } else if (billingAnchor === 15 && nowDay >= 1) {
+      trialEndDate = new Date(currentYear, currentMonth + 1, 15);
+    } else {
+      trialEndDate = new Date(currentYear, currentMonth, billingAnchor);
+    }
+    const trialEndUnix = Math.floor(trialEndDate.getTime() / 1000);
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
+      customer: customerId || undefined,
+      customer_email: customerId ? undefined : email,
       payment_method_types: ['card', 'ideal', 'sepa_debit'],
-      customer_email: email,
       line_items: [
         {
           price_data: {
             currency: 'gbp',
-            unit_amount: parseInt(unitAmount),
+            unit_amount: amount,
             product_data: {
               name: description
             }
@@ -67,18 +66,29 @@ export default async function handler(req, res) {
         }
       ],
       subscription_data: {
-        trial_end: trialEnd,
-        metadata,
-        ...(discountId && { discounts: [{ coupon: discountId }] })
+        trial_end: trialEndUnix,
+        metadata: {
+          choir: record.fields['Choir']?.[0] || '',
+          voicePart: record.fields['Voice Part'] || '',
+          firstName: record.fields['First Name'] || '',
+          surname: record.fields['Surname'] || '',
+          chartCode,
+          chartDescription
+        }
       },
-      metadata,
+      metadata: {
+        recordId,
+        chartCode,
+        chartDescription
+      },
+      discounts: discountCode ? [{ coupon: discountCode }] : undefined,
       success_url: 'https://somevoices.co.uk/success',
       cancel_url: 'https://somevoices.co.uk/cancelled'
     });
 
     res.status(200).json({ url: session.url });
-  } catch (err) {
-    console.error('Stripe Checkout creation error:', err);
-    res.status(500).json({ error: 'Failed to create unified Stripe Checkout session' });
+  } catch (error) {
+    console.error('Stripe session creation error:', error);
+    res.status(500).json({ error: 'Failed to create unified checkout session' });
   }
 }
