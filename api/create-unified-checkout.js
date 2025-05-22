@@ -42,7 +42,7 @@ export default async function handler(req, res) {
     const chartCode = (record.fields['Chart of Accounts Code'] || [])[0] || '';
     const chartDescription = (record.fields['Chart of Accounts Full Length'] || [])[0] || '';
     const description = (record.fields['Initial Payment Description'] || [])[0] || 'Some Voices – Initial Payment';
-    const discountCode = record.fields['Discount Code String'] || null;
+    const discountCode = (record.fields['Discount Code String'] || '').trim();
     const customerId = record.fields['Stripe Customer ID'] || null;
     const billingAnchor = Number(record.fields['Billing Anchor'] || 1);
 
@@ -61,6 +61,8 @@ export default async function handler(req, res) {
       trialEndDate = new Date(currentYear, currentMonth, billingAnchor);
     }
     const trialEndUnix = Math.floor(trialEndDate.getTime() / 1000);
+
+    console.log('Creating Stripe session with coupon:', discountCode);
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
