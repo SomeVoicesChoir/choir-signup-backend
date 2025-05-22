@@ -19,7 +19,9 @@ export default async function handler(req, res) {
     const record = await base('Signup Queue').find(recordId);
 
     const email = record.fields['Email'];
-    const priceId = record.fields['Stripe PRICE_ID'];
+    const rawPriceId = record.fields['Stripe PRICE_ID'];
+    const priceId = Array.isArray(rawPriceId) ? rawPriceId[0] : rawPriceId;
+
     const amount = Number((record.fields['Total Cost Initial Invoice'] || [])[0] || 0);
     const chartCode = (record.fields['Chart of Accounts Code'] || [])[0] || '';
     const chartDescription = (record.fields['Chart of Accounts Full Length'] || [])[0] || '';
