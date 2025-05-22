@@ -12,15 +12,23 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { recordId, amount } = req.body;
-
-  if (!recordId || !amount) {
-    return res.status(400).json({ error: 'Missing recordId or amount' });
-  }
+  const { recordId } = req.body;
+  if (!recordId) return res.status(400).json({ error: 'Missing recordId' });
 
   try {
     const record = await base('Signup Queue').find(recordId);
     const email = record.fields['Email'];
+
+    // Always fetch the amount from Airtable!
+    const amount = Number((record.fields['Total Cost Initial Invoice'] || [])[0] || 0);
+
+    // Dynamically determine currency (default gbp)
+    const currencyField = record.fields["Stripe 'default_price_data[currency]'"] || 'gbp';
+    const currency = typeof currencyField === 'string'
+      ? currencyField.toLowerCase()
+      : Array.isArray(currencyField)
+        ? currencyField[0].toLowerCase()
+        : 'gbp';
 
     const description = record.fields['Initial Payment Description'] || 'Some Voices – Initial Pro-Rata Payment';
 
@@ -33,15 +41,21 @@ export default async function handler(req, res) {
       chartDescription: (record.fields['Chart of Accounts Full Length'] || [])[0] || ''
     };
 
+    // Support multiple payment methods if EUR
+    let payment_method_types = ['card'];
+    if (currency === 'eur') {
+      payment_method_types = ['card', 'ideal', 'sepa_debit'];
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
-      payment_method_types: ['card'],
+      payment_method_types,
       customer_email: email,
       line_items: [
         {
           price_data: {
-            currency: 'gbp',
-            unit_amount: Number(amount),
+            currency: currency,
+            unit_amount: amount,
             product_data: {
               name: description
             }
@@ -50,11 +64,11 @@ export default async function handler(req, res) {
         }
       ],
       metadata,
-      success_url: 'https://somevoices.co.uk/success',
+      success_url: 'https://somevoices.co.uk/success-initial?recordId={CHECKOUT_SESSION_ID}',
       cancel_url: 'https://somevoices.co.uk/cancelled'
     });
 
-    res.status(200).json({ url: session.url });git
+    res.status(200).json({ url: session.url });
   } catch (error) {
     console.error('Stripe error:', error);
     res.status(500).json({ error: 'Failed to create checkout session' });
