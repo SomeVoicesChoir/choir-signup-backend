@@ -12,7 +12,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { recordId, discountCodeRaw } = req.body;
+  const { recordId } = req.body;
   if (!recordId) return res.status(400).json({ error: 'Missing recordId' });
 
   try {
@@ -44,6 +44,7 @@ export default async function handler(req, res) {
     const description = (record.fields['Initial Payment Description'] || [])[0] || 'Some Voices – Initial Payment';
     const customerId = record.fields['Stripe Customer ID'] || null;
     const billingAnchor = Number(record.fields['Billing Anchor'] || 1);
+    const couponId = (record.fields['Stripe Coupon ID'] || '').trim();
 
     // Trial end date logic (next 1st or 15th)
     const today = new Date();
@@ -60,19 +61,6 @@ export default async function handler(req, res) {
       trialEndDate = new Date(currentYear, currentMonth, billingAnchor);
     }
     const trialEndUnix = Math.floor(trialEndDate.getTime() / 1000);
-
-    // Match discount code to a Stripe coupon by name
-    let couponId = null;
-    if (discountCodeRaw) {
-      const coupons = await stripe.coupons.list({ limit: 100 });
-      const match = coupons.data.find(c => c.name?.toLowerCase() === discountCodeRaw.trim().toLowerCase());
-      if (match) {
-        couponId = match.id;
-        console.log('Matched discount code to coupon:', couponId);
-      } else {
-        console.warn('No matching coupon found for code:', discountCodeRaw);
-      }
-    }
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
