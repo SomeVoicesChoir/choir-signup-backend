@@ -20,7 +20,9 @@ export default async function handler(req, res) {
     const email = record.fields['Email'];
 
     // Always fetch the amount from Airtable!
-    const amount = Number((record.fields['Total Cost Initial Invoice'] || [])[0] || 0);
+    const amount = Number(record.fields['Total Cost Initial Invoice'] || 0);
+console.log('Initial payment amount:', amount);
+
 
     // Dynamically determine currency (default gbp)
     const currencyField = record.fields["Stripe 'default_price_data[currency]'"] || 'gbp';
