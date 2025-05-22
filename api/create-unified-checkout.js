@@ -140,7 +140,6 @@ export default async function handler(req, res) {
       payment_method_types,
       line_items,
       subscription_data: {
-        trial_end: currency === 'eur' ? trialEndUnix : undefined, // Only set trial for EUR
         metadata: {
           choir: record.fields['Choir']?.[0] || '',
           voicePart: record.fields['Voice Part'] || '',
