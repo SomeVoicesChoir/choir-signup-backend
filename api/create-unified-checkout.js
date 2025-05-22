@@ -42,7 +42,7 @@ export default async function handler(req, res) {
     const chartCode = (record.fields['Chart of Accounts Code'] || [])[0] || '';
     const chartDescription = (record.fields['Chart of Accounts Full Length'] || [])[0] || '';
     const description = (record.fields['Initial Payment Description'] || [])[0] || 'Some Voices – Initial Payment';
-    const discountCode = (record.fields['Discount Code'] || [])[0];
+    const discountCode = record.fields['Discount Code String'] || null;
     const customerId = record.fields['Stripe Customer ID'] || null;
     const billingAnchor = Number(record.fields['Billing Anchor'] || 1);
 
