@@ -44,7 +44,10 @@ export default async function handler(req, res) {
     const description = (record.fields['Initial Payment Description'] || [])[0] || 'Some Voices – Initial Payment';
     const customerId = record.fields['Stripe Customer ID'] || null;
     const billingAnchor = Number(record.fields['Billing Anchor'] || 1);
-    const couponId = (record.fields['Stripe Coupon ID'] || '').trim();
+    let couponId = record.fields['Stripe Coupon ID'];
+if (Array.isArray(couponId)) {
+  couponId = couponId[0] || null;
+}
 
     // Trial end date logic (next 1st or 15th)
     const today = new Date();
