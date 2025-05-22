@@ -131,6 +131,34 @@ export default async function handler(req, res) {
     if (couponId) {
       discounts = [{ coupon: couponId }];
     }
+    console.log('Creating Stripe Checkout session with payload:', {
+      mode: 'subscription',
+      customer: customerId || undefined,
+      customer_email: customerId ? undefined : email,
+      payment_method_types,
+      line_items,
+      subscription_data: {
+        // trial_end: currency === 'eur' ? trialEndUnix : undefined, // REMOVE THIS LINE!
+        metadata: {
+          choir: record.fields['Choir']?.[0] || '',
+          voicePart: record.fields['Voice Part'] || '',
+          firstName: record.fields['First Name'] || '',
+          surname: record.fields['Surname'] || '',
+          chartCode,
+          chartDescription
+        },
+        discounts,
+      },
+      metadata: {
+        recordId,
+        chartCode,
+        chartDescription
+      },
+      success_url: 'https://somevoices.co.uk/success',
+      cancel_url: 'https://somevoices.co.uk/cancelled'
+    });
+    
+
 
     // Create Stripe Checkout session
     const session = await stripe.checkout.sessions.create({
