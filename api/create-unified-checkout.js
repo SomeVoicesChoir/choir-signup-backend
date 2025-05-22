@@ -12,7 +12,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { recordId } = req.body;
+  const { recordId, discountCodeRaw } = req.body;
   if (!recordId) return res.status(400).json({ error: 'Missing recordId' });
 
   try {
@@ -21,7 +21,7 @@ export default async function handler(req, res) {
     const email = record.fields['Email'];
     const rawPriceId = record.fields['Stripe PRICE_ID'];
 
-    // Strict sanitization for Stripe PRICE_ID
+    // Clean Stripe PRICE_ID
     let priceId = '';
     if (typeof rawPriceId === 'string') {
       priceId = rawPriceId;
@@ -42,11 +42,10 @@ export default async function handler(req, res) {
     const chartCode = (record.fields['Chart of Accounts Code'] || [])[0] || '';
     const chartDescription = (record.fields['Chart of Accounts Full Length'] || [])[0] || '';
     const description = (record.fields['Initial Payment Description'] || [])[0] || 'Some Voices – Initial Payment';
-    const discountCode = (record.fields['Discount Code String'] || '').trim();
     const customerId = record.fields['Stripe Customer ID'] || null;
     const billingAnchor = Number(record.fields['Billing Anchor'] || 1);
 
-    // Determine trial end (next 1st or 15th)
+    // Trial end date logic (next 1st or 15th)
     const today = new Date();
     const currentMonth = today.getMonth();
     const currentYear = today.getFullYear();
@@ -62,7 +61,18 @@ export default async function handler(req, res) {
     }
     const trialEndUnix = Math.floor(trialEndDate.getTime() / 1000);
 
-    console.log('Creating Stripe session with coupon:', discountCode);
+    // Match discount code to a Stripe coupon by name
+    let couponId = null;
+    if (discountCodeRaw) {
+      const coupons = await stripe.coupons.list({ limit: 100 });
+      const match = coupons.data.find(c => c.name?.toLowerCase() === discountCodeRaw.trim().toLowerCase());
+      if (match) {
+        couponId = match.id;
+        console.log('Matched discount code to coupon:', couponId);
+      } else {
+        console.warn('No matching coupon found for code:', discountCodeRaw);
+      }
+    }
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
@@ -100,7 +110,7 @@ export default async function handler(req, res) {
         chartCode,
         chartDescription
       },
-      discounts: discountCode ? [{ coupon: discountCode }] : undefined,
+      discounts: couponId ? [{ coupon: couponId }] : undefined,
       success_url: 'https://somevoices.co.uk/success',
       cancel_url: 'https://somevoices.co.uk/cancelled'
     });
