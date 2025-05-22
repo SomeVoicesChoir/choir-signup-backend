@@ -66,7 +66,6 @@ export default async function handler(req, res) {
       mode: 'subscription',
       customer: customerId || undefined,
       customer_email: customerId ? undefined : email,
-      payment_method_types: ['card', 'ideal', 'sepa_debit'],
       line_items: [
         {
           price_data: {
