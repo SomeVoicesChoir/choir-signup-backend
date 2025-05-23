@@ -19,10 +19,12 @@ export default async function handler(req, res) {
     // 1. Load Airtable record
     const record = await base('Signup Queue').find(recordId);
 
+    // Stripe Customer ID logic
     const email = record.fields['Email'];
-    const rawPriceId = record.fields['Stripe PRICE_ID'];
+    const customerId = record.fields['Stripe Customer ID'] || null;
 
     // Get recurring priceId (subscription)
+    const rawPriceId = record.fields['Stripe PRICE_ID'];
     let priceId = '';
     if (typeof rawPriceId === 'string') {
       priceId = rawPriceId;
@@ -40,34 +42,13 @@ export default async function handler(req, res) {
 
     // Get one-off initial payment amount (pro-rata)
     const initialAmount = Number(record.fields['Month 1 Initial Cost (from Choir)'] || 0);
-const initialDesc = record.fields['Initial Payment Description'] || 'Some Voices – Initial Pro-Rata Payment';
-console.log('Initial Amount:', initialAmount, 'Initial Desc:', initialDesc);
+    const initialDesc = record.fields['Initial Payment Description'] || 'Some Voices – Initial Pro-Rata Payment';
 
-let line_items = [
-  {
-    price_data: {
-      currency: 'gbp',
-      unit_amount: initialAmount,
-      product_data: {
-        name: initialDesc
-      }
-    },
-    quantity: 1
-  },
-  {
-    price: priceId,
-    quantity: 1
-  }
-];
-
-    // Subscription description/metadata
+    // Subscription meta
     const chartCode = (record.fields['Chart of Accounts Code'] || [])[0] || '';
     const chartDescription = (record.fields['Chart of Accounts Full Length'] || [])[0] || '';
-
-    // Coupon (Stripe Coupon ID, optional)
     const couponId = (record.fields['Stripe Coupon ID'] || [])[0] || null;
 
-    // Recurring subscription metadata
     const metadata = {
       choir: record.fields['Choir']?.[0] || '',
       voicePart: record.fields['Voice Part'] || '',
@@ -77,11 +58,9 @@ let line_items = [
       chartDescription
     };
 
-// add log for initial payment
-console.log('Airtable Field {Total Cost Initial Invoice}:', record.fields['Total Cost Initial Invoice']);
+    let payment_method_types = ['card'];
+    let discounts = couponId ? [{ coupon: couponId }] : undefined;
 
-
-    // Build line_items array: initial one-off and recurring sub
     let line_items = [
       {
         price_data: {
@@ -99,16 +78,9 @@ console.log('Airtable Field {Total Cost Initial Invoice}:', record.fields['Total
       }
     ];
 
-    // Only allow card for GBP
-    let payment_method_types = ['card'];
-
-    // Prepare discounts (for subscription only, NOT initial)
-    let discounts = couponId ? [{ coupon: couponId }] : undefined;
-
     // --- CREATE STRIPE CHECKOUT SESSION ---
     const payload = {
       mode: 'subscription',
-      customer_email: email,
       payment_method_types,
       line_items,
       subscription_data: {
@@ -120,6 +92,8 @@ console.log('Airtable Field {Total Cost Initial Invoice}:', record.fields['Total
         chartCode,
         chartDescription
       },
+      customer: customerId || undefined,              // Key improvement!
+      customer_email: customerId ? undefined : email,  // Only set if NOT using customerId
       success_url: 'https://somevoices.co.uk/success',
       cancel_url: 'https://somevoices.co.uk/cancelled'
     };
