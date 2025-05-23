@@ -3,10 +3,13 @@ import Airtable from 'airtable';
 
 const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);
 
-// Helper: Lookup Discount Code record ID by code string
+// Helper: Lookup Discount Code record ID by code string (adjust field name as necessary)
 async function getDiscountCodeRecordId(codeString) {
   if (!codeString) return null;
-  const filter = `LOWER({Discount Code}) = '${codeString.toLowerCase().replace(/'/g, "\\'")}'`;
+  // Use your real field name for the code text in Discount Codes table
+  const codeFieldName = 'Discount Code'; // <<-- Change if your table is different
+  const safeCode = codeString.replace(/'/g, "\\'");
+  const filter = `LOWER({${codeFieldName}}) = '${safeCode.toLowerCase()}'`;
   const records = await base('Discount Codes').select({
     filterByFormula: filter,
     maxRecords: 1,
@@ -38,16 +41,17 @@ export default async function handler(req, res) {
   } = req.body;
 
   try {
-    // Lookup Discount Code record ID if provided
+    // Lookup Discount Code record ID if a code was provided
     let discountCodeRecordId = undefined;
-    if (discountCodeString && discountCodeString.length > 0) {
+    if (discountCodeString && discountCodeString.trim().length > 0) {
       discountCodeRecordId = await getDiscountCodeRecordId(discountCodeString.trim());
       if (!discountCodeRecordId) {
+        // If the code does not exist, return an error (handled in frontend)
         return res.status(400).json({ error: 'Discount Code Not Valid' });
       }
     }
 
-    // Now create the record
+    // Create the Signup Queue record, linking the Discount Code if valid
     const airtableRecord = await base('Signup Queue').create({
       'First Name': firstName || '',
       'Surname': surname || '',
