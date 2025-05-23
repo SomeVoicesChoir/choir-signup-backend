@@ -1,16 +1,17 @@
+// create-airtable-record-step1.js
 import Airtable from 'airtable';
 
 const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);
 
-// Helper function to look up Discount Code record ID by code string
-async function getDiscountCodeRecordId(code) {
-  if (!code) return null;
+// Helper: Lookup Discount Code record ID by code string
+async function getDiscountCodeRecordId(codeString) {
+  if (!codeString) return null;
+  const filter = `LOWER({Discount Code}) = '${codeString.toLowerCase().replace(/'/g, "\\'")}'`;
   const records = await base('Discount Codes').select({
-    filterByFormula: `{Code} = "${code}"`,
-    maxRecords: 1
+    filterByFormula: filter,
+    maxRecords: 1,
   }).firstPage();
-
-  return records && records.length > 0 ? records[0].id : null;
+  return records.length > 0 ? records[0].id : null;
 }
 
 export default async function handler(req, res) {
@@ -32,12 +33,12 @@ export default async function handler(req, res) {
     billingAnchor,
     stripeCustomerId,
     stripeSubscriptionId,
-    discountCodeString,     // <-- Now expecting this from frontend
-    existingMemberRecordId
+    discountCodeString, // User input as code, not record ID!
+    existingMemberRecordId,
   } = req.body;
 
   try {
-    // If discountCodeString provided, look up its Airtable record ID
+    // Lookup Discount Code record ID if provided
     let discountCodeRecordId = undefined;
     if (discountCodeString && discountCodeString.length > 0) {
       discountCodeRecordId = await getDiscountCodeRecordId(discountCodeString.trim());
@@ -46,6 +47,7 @@ export default async function handler(req, res) {
       }
     }
 
+    // Now create the record
     const airtableRecord = await base('Signup Queue').create({
       'First Name': firstName || '',
       'Surname': surname || '',
@@ -55,7 +57,7 @@ export default async function handler(req, res) {
       'Billing Anchor': billingAnchor || '',
       'Stripe Customer ID': stripeCustomerId || '',
       'Stripe Subscription ID': stripeSubscriptionId || '',
-      'Discount Code': discountCodeRecordId ? [discountCodeRecordId] : undefined, // Correct linked record
+      'Discount Code': discountCodeRecordId ? [discountCodeRecordId] : undefined,
       'Existing Member Record ID': existingMemberRecordId || ''
     });
 
