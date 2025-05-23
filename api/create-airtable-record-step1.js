@@ -6,6 +6,10 @@ const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process
 // Helper: Lookup Discount Code record ID by code string in Discount Codes table
 async function getDiscountCodeRecordId(codeString) {
   if (!codeString) return null;
+  
+  // log file below:
+  console.log("Looking up code:", codeString, "against formula field {Discount Code}");
+  
   const safeCode = codeString.replace(/'/g, "\\'");
   const filter = `LOWER({Discount Code}) = '${safeCode.toLowerCase()}'`;
   const records = await base('Discount Codes').select({
