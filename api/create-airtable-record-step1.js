@@ -36,8 +36,7 @@ export default async function handler(req, res) {
       'Billing Anchor': billingAnchor || '',
       'Stripe Customer ID': stripeCustomerId || '',
       'Stripe Subscription ID': stripeSubscriptionId || '',
-      'Discount Code': discountCode && discountCode.length > 0 ? discountCode : undefined,
-      'Discount Code String': discountCodeString || '',     // <-- This line ensures it is passed to Airtable!
+      'Discount Code': discountCode ? [discountCode] : undefined, // Directly as array
       'Existing Member Record ID': existingMemberRecordId || ''
     });
 
