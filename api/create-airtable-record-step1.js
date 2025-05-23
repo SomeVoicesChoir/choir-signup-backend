@@ -6,10 +6,10 @@ const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process
 // Helper: Lookup Discount Code record ID by code string in Discount Codes table
 async function getDiscountCodeRecordId(codeString) {
   if (!codeString) return null;
-  
-  // log file below:
+  // Log for debugging
   console.log("Looking up code:", codeString, "against formula field {Discount Code}");
-  
+
+  // Protect apostrophes and lower-case the string for robust match
   const safeCode = codeString.replace(/'/g, "\\'");
   const filter = `LOWER({Discount Code}) = '${safeCode.toLowerCase()}'`;
   const records = await base('Discount Codes').select({
@@ -38,15 +38,15 @@ export default async function handler(req, res) {
     billingAnchor,
     stripeCustomerId,
     stripeSubscriptionId,
-    discountCodeString, // User input as code, not record ID!
+    discountCode, // <-- field from frontend
     existingMemberRecordId,
   } = req.body;
 
   try {
     // Lookup Discount Code record ID if provided
     let discountCodeRecordId = undefined;
-    if (discountCodeString && discountCodeString.trim().length > 0) {
-      discountCodeRecordId = await getDiscountCodeRecordId(discountCodeString.trim());
+    if (discountCode && discountCode.trim().length > 0) {
+      discountCodeRecordId = await getDiscountCodeRecordId(discountCode.trim());
       if (!discountCodeRecordId) {
         return res.status(400).json({ error: 'Discount Code Not Valid' });
       }
