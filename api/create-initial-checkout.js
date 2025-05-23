@@ -1,3 +1,4 @@
+// create-initial-checkout.js
 import Stripe from 'stripe';
 import Airtable from 'airtable';
 
@@ -21,8 +22,7 @@ export default async function handler(req, res) {
 
     // Always fetch the amount from Airtable!
     const amount = Number(record.fields['Total Cost Initial Invoice'] || 0);
-console.log('Initial payment amount:', amount);
-
+    console.log('Initial payment amount:', amount);
 
     // Dynamically determine currency (default gbp)
     const currencyField = record.fields["Stripe 'default_price_data[currency]'"] || 'gbp';
@@ -33,6 +33,9 @@ console.log('Initial payment amount:', amount);
         : 'gbp';
 
     const description = record.fields['Initial Payment Description'] || 'Some Voices – Initial Pro-Rata Payment';
+
+    // Try to get an existing Stripe Customer ID from the record, fallback to email
+    const customerId = record.fields['Stripe Customer ID'] || null;
 
     const metadata = {
       choir: record.fields['Choir']?.[0] || '',
@@ -52,7 +55,9 @@ console.log('Initial payment amount:', amount);
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types,
-      customer_email: email,
+      // If you have a Stripe Customer ID, use it; otherwise use customer_email (Stripe will create a new customer if needed)
+      customer: customerId || undefined,
+      customer_email: customerId ? undefined : email,
       line_items: [
         {
           price_data: {
