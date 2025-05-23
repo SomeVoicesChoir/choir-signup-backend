@@ -2,6 +2,17 @@ import Airtable from 'airtable';
 
 const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);
 
+// Helper function to look up Discount Code record ID by code string
+async function getDiscountCodeRecordId(code) {
+  if (!code) return null;
+  const records = await base('Discount Codes').select({
+    filterByFormula: `{Code} = "${code}"`,
+    maxRecords: 1
+  }).firstPage();
+
+  return records && records.length > 0 ? records[0].id : null;
+}
+
 export default async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -21,12 +32,20 @@ export default async function handler(req, res) {
     billingAnchor,
     stripeCustomerId,
     stripeSubscriptionId,
-    discountCode,           // For linked record field (if automation resolves this)
-    discountCodeString,     // <-- New: for plain text field entry
+    discountCodeString,     // <-- Now expecting this from frontend
     existingMemberRecordId
   } = req.body;
 
   try {
+    // If discountCodeString provided, look up its Airtable record ID
+    let discountCodeRecordId = undefined;
+    if (discountCodeString && discountCodeString.length > 0) {
+      discountCodeRecordId = await getDiscountCodeRecordId(discountCodeString.trim());
+      if (!discountCodeRecordId) {
+        return res.status(400).json({ error: 'Discount Code Not Valid' });
+      }
+    }
+
     const airtableRecord = await base('Signup Queue').create({
       'First Name': firstName || '',
       'Surname': surname || '',
@@ -36,7 +55,7 @@ export default async function handler(req, res) {
       'Billing Anchor': billingAnchor || '',
       'Stripe Customer ID': stripeCustomerId || '',
       'Stripe Subscription ID': stripeSubscriptionId || '',
-      'Discount Code': discountCode ? [discountCode] : undefined, // Directly as array
+      'Discount Code': discountCodeRecordId ? [discountCodeRecordId] : undefined, // Correct linked record
       'Existing Member Record ID': existingMemberRecordId || ''
     });
 
