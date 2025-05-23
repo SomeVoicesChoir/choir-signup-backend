@@ -21,8 +21,9 @@ export default async function handler(req, res) {
     billingAnchor,
     stripeCustomerId,
     stripeSubscriptionId,
-    discountCode,
-    existingMemberRecordId // ✅ plain text field
+    discountCode,           // For linked record field (if automation resolves this)
+    discountCodeString,     // <-- New: for plain text field entry
+    existingMemberRecordId
   } = req.body;
 
   try {
@@ -36,7 +37,8 @@ export default async function handler(req, res) {
       'Stripe Customer ID': stripeCustomerId || '',
       'Stripe Subscription ID': stripeSubscriptionId || '',
       'Discount Code': discountCode && discountCode.length > 0 ? discountCode : undefined,
-      'Existing Member Record ID': existingMemberRecordId || '' // ✅ store as plain string
+      'Discount Code String': discountCodeString || '',     // <-- This line ensures it is passed to Airtable!
+      'Existing Member Record ID': existingMemberRecordId || ''
     });
 
     res.status(200).json({ success: true, recordId: airtableRecord.id });
