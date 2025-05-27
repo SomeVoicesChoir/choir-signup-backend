@@ -18,11 +18,12 @@ export default async function handler(req, res) {
 
   try {
     const record = await base('Signup Queue').find(recordId);
+
     const email = record.fields['Email'];
+    const customerId = record.fields['Stripe Customer ID'] || undefined;
 
     // Always fetch the amount from Airtable!
     const amount = Number(record.fields['Total Cost Initial Invoice'] || 0);
-    console.log('Initial payment amount:', amount);
 
     // Dynamically determine currency (default gbp)
     const currencyField = record.fields["Stripe 'default_price_data[currency]'"] || 'gbp';
@@ -33,9 +34,6 @@ export default async function handler(req, res) {
         : 'gbp';
 
     const description = record.fields['Initial Payment Description'] || 'Some Voices – Initial Pro-Rata Payment';
-
-    // Try to get an existing Stripe Customer ID from the record, fallback to email
-    const customerId = record.fields['Stripe Customer ID'] || null;
 
     const metadata = {
       choir: record.fields['Choir']?.[0] || '',
@@ -55,9 +53,8 @@ export default async function handler(req, res) {
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types,
-      // If you have a Stripe Customer ID, use it; otherwise use customer_email (Stripe will create a new customer if needed)
+      customer_email: email,
       customer: customerId || undefined,
-      customer_email: customerId ? undefined : email,
       line_items: [
         {
           price_data: {
@@ -70,8 +67,11 @@ export default async function handler(req, res) {
           quantity: 1
         }
       ],
+      payment_intent_data: {
+        setup_future_usage: 'off_session'
+      },
       metadata,
-      success_url: 'https://somevoices.co.uk/success-initial?recordId={CHECKOUT_SESSION_ID}',
+      success_url: 'https://somevoices.co.uk/success-initial?session_id={CHECKOUT_SESSION_ID}',
       cancel_url: 'https://somevoices.co.uk/cancelled'
     });
 
