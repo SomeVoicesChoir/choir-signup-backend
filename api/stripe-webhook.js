@@ -12,7 +12,7 @@ export const config = {
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2023-10-16' });
 const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);
 
-// Helper to read raw buffer for signature validation
+// Helper: Read raw buffer for signature validation
 async function getRawBody(req) {
   const chunks = [];
   for await (const chunk of req) {
@@ -21,7 +21,7 @@ async function getRawBody(req) {
   return Buffer.concat(chunks);
 }
 
-// Helper to get next 1st or 15th date
+// Helper: Calculate next billing anchor date (1st or 15th)
 function getNextAnchorDate(anchorDay) {
   const now = new Date();
   let next;
@@ -51,6 +51,7 @@ export default async function handler(req, res) {
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
+  // Handle checkout.session.completed
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
 
@@ -60,23 +61,24 @@ export default async function handler(req, res) {
 
       try {
         const record = await base('Signup Queue').find(recordId);
-        const customerId = session.customer; // Use Stripe customer ID from session
+        const customerId = session.customer;
         const priceId = record.fields['Stripe PRICE_ID'];
         const couponId = (record.fields['Stripe Coupon ID'] || [])[0] || undefined;
         const billingAnchor = Number(record.fields['Billing Anchor']) || 1;
 
-        // Save Stripe Customer ID into Signup Queue
+        // Update Airtable with Stripe Customer ID and mark initial payment success
         await base('Signup Queue').update(recordId, {
           'Stripe Customer ID': customerId,
           'Initial Payment Status': 'Success',
         });
 
-        // Create Stripe subscription
+        // Calculate billing anchor
         const anchorDate = getNextAnchorDate(billingAnchor);
         const anchorUnix = Math.floor(anchorDate.getTime() / 1000);
         const chartCode = (record.fields['Chart of Accounts Code'] || [])[0] || '';
         const chartDescription = (record.fields['Chart of Accounts Full Length'] || [])[0] || '';
 
+        // Create the subscription in Stripe
         await stripe.subscriptions.create({
           customer: customerId,
           items: [{ price: Array.isArray(priceId) ? priceId[0] : priceId }],
@@ -90,18 +92,17 @@ export default async function handler(req, res) {
           },
         });
 
-        console.log(`Subscription created for customer: ${customerId}`);
+        console.log(`✅ Subscription created for customer: ${customerId}`);
       } catch (err) {
-        console.error('Stripe subscription error:', err);
+        console.error('🚨 Error during subscription creation:', err);
       }
     }
   }
 
+  // Handle invoice.created
   if (event.type === 'invoice.created') {
     const invoice = event.data.object;
-
     try {
-      // Check if customer exists in Customer Record table
       const customerId = invoice.customer;
       const email = invoice.customer_email || '';
       const customerRecords = await base('Customer Record').select({
@@ -113,7 +114,6 @@ export default async function handler(req, res) {
       if (customerRecords.length > 0) {
         customerRecordId = customerRecords[0].id;
       } else {
-        // If no existing customer record, create one
         const newCustomer = await base('Customer Record').create({
           'Email': email,
           'Stripe Customer_ID': customerId,
@@ -134,9 +134,9 @@ export default async function handler(req, res) {
         'Status': invoice.status || '',
       });
 
-      console.log(`Invoice logged for ${invoice.id}`);
+      console.log(`📄 Invoice logged for ${invoice.id}`);
     } catch (err) {
-      console.error('Airtable error logging invoice:', err);
+      console.error('❌ Airtable error logging invoice:', err);
     }
   }
 
