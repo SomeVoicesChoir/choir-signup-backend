@@ -1,4 +1,4 @@
-// pages/api/stripe-webhook.js
+// /api/stripe-webhook.js
 import Stripe from 'stripe';
 import Airtable from 'airtable';
 
@@ -12,7 +12,7 @@ export const config = {
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2023-10-16' });
 const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);
 
-// Helper: Read raw body for signature verification
+// Helper: Read raw body for signature validation
 async function getRawBody(req) {
   const chunks = [];
   for await (const chunk of req) {
@@ -21,7 +21,7 @@ async function getRawBody(req) {
   return Buffer.concat(chunks);
 }
 
-// Helper: Get next billing anchor date
+// Helper: Get next 1st or 15th
 function getNextAnchorDate(anchorDay) {
   const now = new Date();
   let next;
@@ -34,7 +34,7 @@ function getNextAnchorDate(anchorDay) {
       ? new Date(now.getFullYear(), now.getMonth() + 1, 1)
       : new Date(now.getFullYear(), now.getMonth(), 1);
   }
-  return Math.floor(next.getTime() / 1000);
+  return next;
 }
 
 export default async function handler(req, res) {
@@ -45,108 +45,97 @@ export default async function handler(req, res) {
 
   let event;
   try {
-    event = stripe.webhooks.constructEvent(
-      rawBody,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
+    event = stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
-    console.error('Webhook signature verification failed:', err.message);
+    console.error('⚠️  Webhook signature verification failed:', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
 
-    const recordId = session.metadata?.recordId;
-    const customerId = session.customer;
-    const customerEmail = session.customer_email || session.customer_details?.email;
-    const firstName = session.metadata?.firstName || '';
-    const surname = session.metadata?.surname || '';
-    const choir = session.metadata?.choir || '';
+    if (session.mode === 'payment') {
+      const recordId = session.metadata?.recordId;
+      if (!recordId) return res.status(200).send('No recordId');
 
-    if (!customerId || !customerEmail) {
-      console.warn('Missing customer ID or email');
-      return res.status(200).send('No customer ID or email');
-    }
+      try {
+        const record = await base('Signup Queue').find(recordId);
 
-    try {
-      // 1️⃣ Create or update Customer Record
-      const customerRecords = await base('Customer Record').select({
-        filterByFormula: `OR({Stripe Customer ID} = '${customerId}', {Email} = '${customerEmail}')`,
-        maxRecords: 1
-      }).firstPage();
-
-      if (customerRecords.length > 0) {
-        // Update existing
-        const existing = customerRecords[0];
-        await base('Customer Record').update(existing.id, {
-          'Stripe Customer ID': customerId,
-          'First Name': firstName,
-          'Surname': surname,
-          'Email': customerEmail,
-          'Choir': choir
-        });
-        console.log(`Updated Customer Record: ${existing.id}`);
-      } else {
-        // Create new
-        const created = await base('Customer Record').create({
-          'Stripe Customer ID': customerId,
-          'First Name': firstName,
-          'Surname': surname,
-          'Email': customerEmail,
-          'Choir': choir
-        });
-        console.log(`Created Customer Record: ${created.id}`);
-      }
-
-      // 2️⃣ Update Signup Queue record
-      if (recordId) {
-        await base('Signup Queue').update(recordId, {
-          'Initial Payment Status': 'Success',
-          'Stripe Customer ID': customerId
-        });
-        console.log(`Updated Signup Queue: ${recordId}`);
-      }
-
-      // 3️⃣ Optional: Create subscription if needed
-      const record = recordId ? await base('Signup Queue').find(recordId) : null;
-      if (record) {
         const priceId = record.fields['Stripe PRICE_ID'];
         const couponId = (record.fields['Stripe Coupon ID'] || [])[0] || undefined;
         const billingAnchor = Number(record.fields['Billing Anchor']) || 1;
+        const chartCode = (record.fields['Chart of Accounts Code'] || [])[0] || '';
+        const chartDescription = (record.fields['Chart of Accounts Full Length'] || [])[0] || '';
 
-        if (priceId) {
-          const subscription = await stripe.subscriptions.create({
-            customer: customerId,
-            items: [{ price: priceId }],
-            coupon: couponId,
-            billing_cycle_anchor: getNextAnchorDate(billingAnchor),
-            metadata: {
-              recordId,
-              choir,
-              firstName,
-              surname
-            }
-          });
+        const anchorDate = getNextAnchorDate(billingAnchor);
+        const anchorUnix = Math.floor(anchorDate.getTime() / 1000);
 
-          await base('Signup Queue').update(recordId, {
-            'Stripe Subscription ID': subscription.id,
-            'Subscription Status': 'Active'
-          });
-          console.log(`Subscription created: ${subscription.id}`);
-        }
+        const subscription = await stripe.subscriptions.create({
+          customer: session.customer,
+          items: [{ price: Array.isArray(priceId) ? priceId[0] : priceId }],
+          billing_cycle_anchor: anchorUnix,
+          coupon: couponId,
+          metadata: {
+            airtable_record_id: recordId,
+            choir: record.fields['Choir']?.[0] || '',
+            chartCode,
+            chartDescription
+          }
+        });
+
+        await base('Signup Queue').update(recordId, {
+          'Subscription Status': 'Active',
+          'Stripe Subscription ID': subscription.id
+        });
+
+        console.log(`Subscription created for customer: ${session.customer}`);
+        return res.status(200).send('Subscription created');
+      } catch (err) {
+        console.error('Stripe subscription creation error:', err);
+        return res.status(500).send('Failed to create subscription');
       }
-
-      // 4️⃣ Optional: Log invoice (this webhook doesn't create an invoice – separate webhook recommended)
-      // If you want to capture invoices, listen for invoice.paid or invoice.created events.
-
-      res.status(200).send('Handled checkout.session.completed');
-    } catch (err) {
-      console.error('Error handling event:', err);
-      res.status(500).send('Internal Error');
     }
-  } else {
-    res.status(200).send('Event received');
   }
+
+  if (event.type === 'invoice.created') {
+    const invoice = event.data.object;
+
+    try {
+      const customerId = invoice.customer;
+      const amountDue = invoice.amount_due;
+      const currency = invoice.currency;
+      const invoiceNumber = invoice.number;
+      const invoiceId = invoice.id;
+      const invoiceDate = new Date(invoice.created * 1000).toISOString();
+      const subscriptionId = invoice.subscription || '';
+      const description = invoice.description || '';
+
+      // Link to Customer Record
+      const customerRecords = await base('Customer Record').select({
+        filterByFormula: `{Stripe Customer_ID} = '${customerId}'`,
+        maxRecords: 1
+      }).firstPage();
+      const customerRecordId = customerRecords[0]?.id;
+
+      await base('Stripe Invoices').create({
+        'Invoice_ID': invoiceId,
+        'Invoice Number': invoiceNumber,
+        '*Link Customer Record': customerRecordId ? [customerRecordId] : [],
+        'Gross Amount': amountDue,
+        'Currency': currency.toUpperCase(),
+        'Invoice Date': invoiceDate,
+        'Subscription ID': subscriptionId,
+        'Invoice Description': description,
+        'Status': invoice.status || 'unknown'
+      });
+
+      console.log(`Invoice logged: ${invoiceId}`);
+      return res.status(200).send('Invoice logged');
+    } catch (err) {
+      console.error('Invoice logging error:', err);
+      return res.status(500).send('Failed to log invoice');
+    }
+  }
+
+  res.status(200).send('Event received');
 }
