@@ -50,11 +50,10 @@ export default async function handler(req, res) {
       payment_method_types = ['card', 'ideal', 'sepa_debit'];
     }
 
-    const session = await stripe.checkout.sessions.create({
+    // Build session payload, set only one of customer or customer_email
+    const sessionPayload = {
       mode: 'payment',
       payment_method_types,
-      customer_email: email,
-      customer: customerId || undefined,
       line_items: [
         {
           price_data: {
@@ -73,7 +72,15 @@ export default async function handler(req, res) {
       metadata,
       success_url: 'https://somevoices.co.uk/success-initial?session_id={CHECKOUT_SESSION_ID}',
       cancel_url: 'https://somevoices.co.uk/cancelled'
-    });
+    };
+
+    if (customerId && typeof customerId === 'string' && customerId.length > 0) {
+      sessionPayload.customer = customerId;
+    } else if (email && email.length > 0) {
+      sessionPayload.customer_email = email;
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionPayload);
 
     res.status(200).json({ url: session.url });
   } catch (error) {
