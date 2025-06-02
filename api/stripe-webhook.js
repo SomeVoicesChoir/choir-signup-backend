@@ -1,4 +1,4 @@
-// /api/stripe-webhook.js
+// pages/api/stripe-webhook.js
 import Stripe from 'stripe';
 import Airtable from 'airtable';
 
@@ -12,7 +12,7 @@ export const config = {
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2023-10-16' });
 const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);
 
-// Helper: Read raw body for signature validation
+// Helper to read raw buffer for signature validation
 async function getRawBody(req) {
   const chunks = [];
   for await (const chunk of req) {
@@ -21,7 +21,7 @@ async function getRawBody(req) {
   return Buffer.concat(chunks);
 }
 
-// Helper: Get next 1st or 15th
+// Helper to get next 1st or 15th date
 function getNextAnchorDate(anchorDay) {
   const now = new Date();
   let next;
@@ -47,7 +47,7 @@ export default async function handler(req, res) {
   try {
     event = stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
-    console.error('⚠️  Webhook signature verification failed:', err.message);
+    console.error('⚠️ Webhook signature verification failed:', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
@@ -60,18 +60,25 @@ export default async function handler(req, res) {
 
       try {
         const record = await base('Signup Queue').find(recordId);
-
+        const customerId = session.customer; // Use Stripe customer ID from session
         const priceId = record.fields['Stripe PRICE_ID'];
         const couponId = (record.fields['Stripe Coupon ID'] || [])[0] || undefined;
         const billingAnchor = Number(record.fields['Billing Anchor']) || 1;
+
+        // Save Stripe Customer ID into Signup Queue
+        await base('Signup Queue').update(recordId, {
+          'Stripe Customer ID': customerId,
+          'Initial Payment Status': 'Success',
+        });
+
+        // Create Stripe subscription
+        const anchorDate = getNextAnchorDate(billingAnchor);
+        const anchorUnix = Math.floor(anchorDate.getTime() / 1000);
         const chartCode = (record.fields['Chart of Accounts Code'] || [])[0] || '';
         const chartDescription = (record.fields['Chart of Accounts Full Length'] || [])[0] || '';
 
-        const anchorDate = getNextAnchorDate(billingAnchor);
-        const anchorUnix = Math.floor(anchorDate.getTime() / 1000);
-
-        const subscription = await stripe.subscriptions.create({
-          customer: session.customer,
+        await stripe.subscriptions.create({
+          customer: customerId,
           items: [{ price: Array.isArray(priceId) ? priceId[0] : priceId }],
           billing_cycle_anchor: anchorUnix,
           coupon: couponId,
@@ -80,19 +87,12 @@ export default async function handler(req, res) {
             choir: record.fields['Choir']?.[0] || '',
             chartCode,
             chartDescription
-          }
+          },
         });
 
-        await base('Signup Queue').update(recordId, {
-          'Subscription Status': 'Active',
-          'Stripe Subscription ID': subscription.id
-        });
-
-        console.log(`Subscription created for customer: ${session.customer}`);
-        return res.status(200).send('Subscription created');
+        console.log(`Subscription created for customer: ${customerId}`);
       } catch (err) {
-        console.error('Stripe subscription creation error:', err);
-        return res.status(500).send('Failed to create subscription');
+        console.error('Stripe subscription error:', err);
       }
     }
   }
@@ -101,39 +101,42 @@ export default async function handler(req, res) {
     const invoice = event.data.object;
 
     try {
+      // Check if customer exists in Customer Record table
       const customerId = invoice.customer;
-      const amountDue = invoice.amount_due;
-      const currency = invoice.currency;
-      const invoiceNumber = invoice.number;
-      const invoiceId = invoice.id;
-      const invoiceDate = new Date(invoice.created * 1000).toISOString();
-      const subscriptionId = invoice.subscription || '';
-      const description = invoice.description || '';
-
-      // Link to Customer Record
+      const email = invoice.customer_email || '';
       const customerRecords = await base('Customer Record').select({
         filterByFormula: `{Stripe Customer_ID} = '${customerId}'`,
-        maxRecords: 1
+        maxRecords: 1,
       }).firstPage();
-      const customerRecordId = customerRecords[0]?.id;
 
+      let customerRecordId;
+      if (customerRecords.length > 0) {
+        customerRecordId = customerRecords[0].id;
+      } else {
+        // If no existing customer record, create one
+        const newCustomer = await base('Customer Record').create({
+          'Email': email,
+          'Stripe Customer_ID': customerId,
+        });
+        customerRecordId = newCustomer.id;
+      }
+
+      // Create invoice record in Stripe Invoices table
       await base('Stripe Invoices').create({
-        'Invoice_ID': invoiceId,
-        'Invoice Number': invoiceNumber,
-        '*Link Customer Record': customerRecordId ? [customerRecordId] : [],
-        'Gross Amount': amountDue,
-        'Currency': currency.toUpperCase(),
-        'Invoice Date': invoiceDate,
-        'Subscription ID': subscriptionId,
-        'Invoice Description': description,
-        'Status': invoice.status || 'unknown'
+        'Invoice_ID': invoice.id,
+        'Invoice Number': invoice.number?.toString() || '',
+        '*Link Customer Record': [customerRecordId],
+        'Gross Amount': invoice.amount_due,
+        'Currency': invoice.currency?.toUpperCase() || 'GBP',
+        'Description': invoice.description || '',
+        'Stripe Timestamp': new Date(invoice.created * 1000).toISOString(),
+        'Subscription ID': invoice.subscription || '',
+        'Status': invoice.status || '',
       });
 
-      console.log(`Invoice logged: ${invoiceId}`);
-      return res.status(200).send('Invoice logged');
+      console.log(`Invoice logged for ${invoice.id}`);
     } catch (err) {
-      console.error('Invoice logging error:', err);
-      return res.status(500).send('Failed to log invoice');
+      console.error('Airtable error logging invoice:', err);
     }
   }
 
