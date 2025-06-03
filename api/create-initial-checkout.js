@@ -20,7 +20,7 @@ export default async function handler(req, res) {
     const record = await base('Signup Queue').find(recordId);
 
     const email = record.fields['Email'];
-    const customerId = record.fields['Stripe Customer ID'] || undefined;
+    const existingCustomerId = record.fields['Stripe Customer ID'] || undefined;
 
     // Always fetch the amount from Airtable!
     const amount = Number(record.fields['Total Cost Initial Invoice'] || 0);
@@ -50,7 +50,24 @@ export default async function handler(req, res) {
       payment_method_types = ['card', 'ideal', 'sepa_debit'];
     }
 
-    // Build session payload, set only one of customer or customer_email
+    // Ensure a Stripe customer exists
+    let finalCustomerId = existingCustomerId;
+
+    if (!finalCustomerId && email) {
+      const customer = await stripe.customers.create({
+        email,
+        name: `${record.fields['First Name'] || ''} ${record.fields['Surname'] || ''}`.trim(),
+        metadata: {
+          airtable_record_id: recordId
+        }
+      });
+      finalCustomerId = customer.id;
+
+      await base('Signup Queue').update(recordId, {
+        'Stripe Customer ID': finalCustomerId
+      });
+    }
+
     const sessionPayload = {
       mode: 'payment',
       payment_method_types,
@@ -71,14 +88,9 @@ export default async function handler(req, res) {
       },
       metadata,
       success_url: 'https://somevoices.co.uk/success-initial?session_id={CHECKOUT_SESSION_ID}',
-      cancel_url: 'https://somevoices.co.uk/cancelled'
+      cancel_url: 'https://somevoices.co.uk/cancelled',
+      customer: finalCustomerId
     };
-
-    if (customerId && typeof customerId === 'string' && customerId.length > 0) {
-      sessionPayload.customer = customerId;
-    } else if (email && email.length > 0) {
-      sessionPayload.customer_email = email;
-    }
 
     const session = await stripe.checkout.sessions.create(sessionPayload);
 
