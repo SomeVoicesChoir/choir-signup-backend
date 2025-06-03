@@ -1,6 +1,5 @@
 import Airtable from 'airtable';
 import Stripe from 'stripe';
-
 const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -15,7 +14,6 @@ export default async function handler(req, res) {
   if (!email || !choir) return res.status(400).json({ error: 'Missing required fields' });
 
   try {
-    // Create Airtable record
     const record = await base('Signup Queue').create({
       'Email': email,
       'First Name': firstName,
@@ -27,7 +25,6 @@ export default async function handler(req, res) {
       'Stripe Customer ID': stripeCustomerId
     });
 
-    // Create Stripe Checkout Session (simplified)
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],

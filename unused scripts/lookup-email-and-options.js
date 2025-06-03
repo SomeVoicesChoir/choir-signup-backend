@@ -12,7 +12,6 @@ export default async function handler(req, res) {
   if (!email) return res.status(400).json({ error: 'Email is required' });
 
   try {
-    // Lookup email in Members table
     const members = await base('Members').select({ filterByFormula: `{Email} = '${email}'`, maxRecords: 1 }).firstPage();
     let found = false, firstName = '', surname = '', latestChoir = '', voicePart = '', stripeCustomerId = null;
     if (members.length) {
@@ -29,11 +28,9 @@ export default async function handler(req, res) {
       found = true;
     }
 
-    // Load choirs
     const choirRecords = await base('Choirs MASTER').select({ view: 'Choir CURRENT (SqSp Signup)' }).all();
     const choirs = choirRecords.map(r => ({ id: r.id, name: r.get('Name') }));
 
-    // Load voice parts
     const voiceRecords = await base('Voice Parts').select({ fields: ['Voice Part'], view: 'Voice Parts' }).firstPage();
     const voiceParts = voiceRecords.map(r => ({ id: r.id, name: r.fields['Voice Part'] }));
 
