@@ -22,10 +22,8 @@ export default async function handler(req, res) {
     const email = record.fields['Email'];
     const existingCustomerId = record.fields['Stripe Customer ID'] || undefined;
 
-    // Always fetch the amount from Airtable!
     const amount = Number(record.fields['Total Cost Initial Invoice'] || 0);
 
-    // Dynamically determine currency (default gbp)
     const currencyField = record.fields["Stripe 'default_price_data[currency]'"] || 'gbp';
     const currency = typeof currencyField === 'string'
       ? currencyField.toLowerCase()
@@ -44,7 +42,6 @@ export default async function handler(req, res) {
       chartDescription: (record.fields['Chart of Accounts Full Length'] || [])[0] || ''
     };
 
-    // Support multiple payment methods if EUR
     let payment_method_types = ['card'];
     if (currency === 'eur') {
       payment_method_types = ['card', 'ideal', 'sepa_debit'];
@@ -74,7 +71,7 @@ export default async function handler(req, res) {
       line_items: [
         {
           price_data: {
-            currency: currency,
+            currency,
             unit_amount: amount,
             product_data: {
               name: description
@@ -83,13 +80,42 @@ export default async function handler(req, res) {
           quantity: 1
         }
       ],
+      customer: finalCustomerId,
+      success_url: 'https://somevoices.co.uk/success-initial?session_id={CHECKOUT_SESSION_ID}',
+      cancel_url: 'https://somevoices.co.uk/cancelled',
       payment_intent_data: {
         setup_future_usage: 'off_session'
       },
       metadata,
-      success_url: 'https://somevoices.co.uk/success-initial?session_id={CHECKOUT_SESSION_ID}',
-      cancel_url: 'https://somevoices.co.uk/cancelled',
-      customer: finalCustomerId
+      customer_update: {
+        address: 'auto',
+        name: 'auto',
+        shipping: 'auto',
+        phone: 'auto'
+      },
+      consent_collection: {
+        terms_of_service: 'required'
+      },
+      custom_fields: [
+        {
+          key: 'terms_confirmed',
+          label: {
+            type: 'custom',
+            custom: 'I agree to the Terms & Conditions'
+          },
+          type: 'checkbox',
+          optional: false
+        }
+      ],
+      custom_text: {
+        terms_of_service: {
+          message: 'By continuing, you agree to our Membership Policy.',
+          link: {
+            text: 'Read the full policy',
+            url: 'https://somevoices.co.uk/membership-policy'
+          }
+        }
+      }
     };
 
     const session = await stripe.checkout.sessions.create(sessionPayload);
