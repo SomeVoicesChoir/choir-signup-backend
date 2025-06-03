@@ -128,7 +128,7 @@ export default async function handler(req, res) {
         '*Link Customer Record': [customerRecordId],
         'Gross Amount': invoice.amount_due,
         'Currency': invoice.currency?.toUpperCase() || 'GBP',
-        'Description': invoice.description || '',
+        'Invoice Description': invoice.description || '',
         'Stripe Timestamp': new Date(invoice.created * 1000).toISOString(),
         'Subscription ID': invoice.subscription || '',
         'Status': invoice.status || '',
