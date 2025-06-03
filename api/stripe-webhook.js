@@ -147,6 +147,16 @@ export default async function handler(req, res) {
         customerRecordId = newCustomer.id;
       }
 
+      // Calculate tax details
+      const taxAmount = invoice.total_tax_amounts?.reduce((sum, tax) => sum + (tax.amount || 0), 0) || 0;
+
+      const taxRates = invoice.total_tax_amounts?.map(tax => {
+        const rate = tax.tax_rate?.percentage || 0;
+        return rate;
+      }) || [];
+
+      const taxRateDisplay = taxRates.length > 0 ? taxRates.join(', ') : '';
+
       // Create invoice record in Stripe Invoices table
       await base('Stripe Invoices').create({
         'Invoice_ID': invoice.id,
@@ -157,7 +167,9 @@ export default async function handler(req, res) {
         'Invoice Description': invoice.description || '',
         'Stripe Timestamp': new Date(invoice.created * 1000).toISOString(),
         'Subscription ID': invoice.subscription || '',
-        'Status': invoice.status || '',
+        'Invoice Status': invoice.status || '',
+        'Tax Deducted': taxAmount,
+        'Tax Rate': taxRateDisplay
       });
 
       console.log(`📄 Invoice logged for ${invoice.id}`);

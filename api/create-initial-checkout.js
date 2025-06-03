@@ -80,6 +80,7 @@ export default async function handler(req, res) {
           quantity: 1
         }
       ],
+      automatic_tax: { enabled: true }, // ✅ Enable automatic tax
       customer: finalCustomerId,
       success_url: 'https://somevoices.co.uk/success-initial?session_id={CHECKOUT_SESSION_ID}',
       cancel_url: 'https://somevoices.co.uk/cancelled',
