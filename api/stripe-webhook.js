@@ -105,6 +105,15 @@ export default async function handler(req, res) {
     try {
       const customerId = invoice.customer;
       const email = invoice.customer_email || '';
+
+      const customer = await stripe.customers.retrieve(customerId);
+
+      const phone = customer.phone || '';
+      const name = customer.name || '';
+      const [firstName, ...surnameParts] = name.trim().split(' ');
+      const surname = surnameParts.join(' ');
+      const address = customer.address || {};
+
       const customerRecords = await base('Customer Record').select({
         filterByFormula: `{Stripe Customer_ID} = '${customerId}'`,
         maxRecords: 1,
@@ -113,10 +122,27 @@ export default async function handler(req, res) {
       let customerRecordId;
       if (customerRecords.length > 0) {
         customerRecordId = customerRecords[0].id;
+
+        await base('Customer Record').update(customerRecordId, {
+          'Mobile Phone Number': phone,
+          'First Name': firstName || '',
+          'Surname': surname || '',
+          'Address Line 1': address.line1 || '',
+          'Address Line 2': address.line2 || '',
+          'Address City': address.city || '',
+          'Post Code': address.postal_code || '',
+        });
       } else {
         const newCustomer = await base('Customer Record').create({
           'Email': email,
           'Stripe Customer_ID': customerId,
+          'Mobile Phone Number': phone,
+          'First Name': firstName || '',
+          'Surname': surname || '',
+          'Address Line 1': address.line1 || '',
+          'Address Line 2': address.line2 || '',
+          'Address City': address.city || '',
+          'Post Code': address.postal_code || '',
         });
         customerRecordId = newCustomer.id;
       }
@@ -136,7 +162,7 @@ export default async function handler(req, res) {
 
       console.log(`📄 Invoice logged for ${invoice.id}`);
     } catch (err) {
-      console.error('❌ Airtable error logging invoice:', err);
+      console.error('❌ Airtable error logging invoice or updating customer:', err);
     }
   }
 
