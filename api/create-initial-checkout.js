@@ -95,17 +95,6 @@ export default async function handler(req, res) {
       consent_collection: {
         terms_of_service: 'required'
       },
-      custom_fields: [
-        {
-          key: 'terms_confirmed',
-          label: {
-            type: 'custom',
-            custom: 'I agree to the Terms & Conditions'
-          },
-          type: 'checkbox',
-          optional: false
-        }
-      ],
       custom_text: {
         terms_of_service: {
           message: 'By continuing, you agree to our Membership Policy.',
