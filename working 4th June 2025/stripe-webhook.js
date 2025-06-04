@@ -92,45 +92,6 @@ export default async function handler(req, res) {
           },
         });
 
-        // 🔁 Members table sync
-        const customerRecords = await base('Customer Record').select({
-          filterByFormula: `{Stripe Customer_ID} = '${customerId}'`,
-          maxRecords: 1,
-        }).firstPage();
-
-        if (customerRecords.length > 0) {
-          const customerRecordId = customerRecords[0].id;
-          const choirId = (record.fields['Choir'] || [])[0] || null;
-
-          const membersRecords = await base('Members').select({
-            filterByFormula: `ARRAYJOIN({*Customer Record}) = '${customerRecordId}'`,
-            maxRecords: 1
-          }).firstPage();
-
-          if (membersRecords.length > 0) {
-            const membersRecord = membersRecords[0];
-            const membersRecordId = membersRecord.id;
-
-            const existingChoirs = membersRecord.fields['Choir'] || [];
-            const updatedChoirs = choirId && !existingChoirs.includes(choirId)
-              ? [...existingChoirs, choirId]
-              : existingChoirs;
-
-            await base('Members').update(membersRecordId, {
-              'Choir': updatedChoirs
-            });
-          } else {
-            await base('Members').create({
-              'Email': record.fields['Email'] || '',
-              'First Name': record.fields['First Name'] || '',
-              'Surname': record.fields['Surname'] || '',
-              'Mobile Phone Number': record.fields['Mobile Phone Number'] || '',
-              '*Customer Record': [customerRecordId],
-              'Choir': choirId ? [choirId] : []
-            });
-          }
-        }
-
         console.log(`✅ Subscription created for customer: ${customerId}`);
       } catch (err) {
         console.error('🚨 Error during subscription creation:', err);
@@ -198,37 +159,6 @@ export default async function handler(req, res) {
         'Subscription ID': invoice.subscription || '',
         'Invoice Status': invoice.status || '',
       });
-
-      // 🔁 Members table sync (same logic)
-      const choirId = (invoice.metadata?.choir || '') || (customerRecords[0]?.fields?.Choir || [])[0] || null;
-
-      const membersRecords = await base('Members').select({
-        filterByFormula: `ARRAYJOIN({*Customer Record}) = '${customerRecordId}'`,
-        maxRecords: 1
-      }).firstPage();
-
-      if (membersRecords.length > 0) {
-        const membersRecord = membersRecords[0];
-        const membersRecordId = membersRecord.id;
-
-        const existingChoirs = membersRecord.fields['Choir'] || [];
-        const updatedChoirs = choirId && !existingChoirs.includes(choirId)
-          ? [...existingChoirs, choirId]
-          : existingChoirs;
-
-        await base('Members').update(membersRecordId, {
-          'Choir': updatedChoirs
-        });
-      } else {
-        await base('Members').create({
-          'Email': email,
-          'First Name': firstName || '',
-          'Surname': surname || '',
-          'Mobile Phone Number': phone || '',
-          '*Customer Record': [customerRecordId],
-          'Choir': choirId ? [choirId] : []
-        });
-      }
 
       console.log(`📄 Invoice logged for ${invoice.id}`);
     } catch (err) {
