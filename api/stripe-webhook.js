@@ -48,7 +48,7 @@ export default async function handler(req, res) {
     event = stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
     console.error('⚠️ Webhook signature verification failed:', err.message);
-    return res.status(400).send(Webhook Error: ${err.message});
+    return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
   // Handle checkout.session.completed
@@ -92,7 +92,7 @@ export default async function handler(req, res) {
           },
         });
 
-        console.log(✅ Subscription created for customer: ${customerId});
+        console.log(`✅ Subscription created for customer: ${customerId}`);
       } catch (err) {
         console.error('🚨 Error during subscription creation:', err);
       }
@@ -115,7 +115,7 @@ export default async function handler(req, res) {
       const address = customer.address || {};
 
       const customerRecords = await base('Customer Record').select({
-        filterByFormula: {Stripe Customer_ID} = '${customerId}',
+        filterByFormula: `{Stripe Customer_ID} = '${customerId}'`,
         maxRecords: 1,
       }).firstPage();
 
@@ -160,7 +160,7 @@ export default async function handler(req, res) {
         'Invoice Status': invoice.status || '',
       });
 
-      console.log(📄 Invoice logged for ${invoice.id});
+      console.log(`📄 Invoice logged for ${invoice.id}`);
     } catch (err) {
       console.error('❌ Airtable error logging invoice or updating customer:', err);
     }
