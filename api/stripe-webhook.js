@@ -47,7 +47,7 @@ export default async function handler(req, res) {
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  // Handle checkout.session.completed
+  // === checkout.session.completed ===
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
     if (session.mode !== 'payment') return res.status(200).send('Not a payment session');
@@ -100,7 +100,7 @@ export default async function handler(req, res) {
         });
         webhookReport.push('✅ Subscription created');
 
-        // Save Subscription ID to Customer Record if exists
+        // Save Subscription ID and other fields to Customer Record
         const customerRecords = await base('Customer Record').select({
           filterByFormula: `{Stripe Customer_ID} = '${customerId}'`,
           maxRecords: 1,
@@ -109,21 +109,17 @@ export default async function handler(req, res) {
         if (customerRecords.length > 0) {
           const customerRecordId = customerRecords[0].id;
 
-          try {
-            await base('Customer Record').update(customerRecordId, {
-              'Stripe Subscription_ID': subscription.id,
-              'Voice Part': voicePart || '',
-              'Choir Name': choirName || '',
-              'Chart of Accounts Code': chartCode || '',
-              'Tracking Code': trackingCode || '',
-              'SKU': sku || ''
-            });
-            webhookReport.push('✅ Customer Record updated');
-          } catch (err) {
-            webhookReport.push(`❌ Error updating Customer Record: ${err.message}`);
-          }
+          await base('Customer Record').update(customerRecordId, {
+            'Stripe Subscription_ID': subscription.id,
+            'Voice Part': voicePart || '',
+            'Choir Name': choirName || '',
+            'Chart of Accounts Code': chartCode || '',
+            'Tracking Code': trackingCode || '',
+            'SKU': sku || ''
+          });
+          webhookReport.push('✅ Customer Record updated');
 
-          // Update or create Members table record
+          // Update or create Members record
           const choirId = (record.fields['Choir'] || [])[0] || null;
           const members = await base('Members').select({
             filterByFormula: `ARRAYJOIN({*Customer Record}) = '${customerRecordId}'`,
@@ -152,6 +148,8 @@ export default async function handler(req, res) {
             });
             webhookReport.push('✅ Members record created');
           }
+        } else {
+          webhookReport.push('❌ No matching Customer Record found to update');
         }
       } catch (err) {
         webhookReport.push(`❌ Subscription/Members sync error: ${err.message}`);
@@ -170,7 +168,7 @@ export default async function handler(req, res) {
     }
   }
 
-  // Handle invoice.created
+  // === invoice.created ===
   if (event.type === 'invoice.created') {
     const invoice = event.data.object;
 
