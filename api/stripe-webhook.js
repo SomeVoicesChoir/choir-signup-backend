@@ -194,7 +194,7 @@ export default async function handler(req, res) {
         'Gross Amount': invoice.amount_due,
         'Currency': invoice.currency?.toUpperCase() || 'GBP',
         'Invoice Description': invoice.description || '',
-        'Stripe Timestamp': new Date(invoice.created * 1000).toISOString(),
+        'Stripe Timestamp': invoice.created,
         'Subscription ID': invoice.subscription || '',
         'Invoice Status': invoice.status || '',
       });
