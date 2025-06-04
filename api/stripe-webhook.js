@@ -2,7 +2,6 @@
 import Stripe from 'stripe';
 import Airtable from 'airtable';
 
-// Disable Vercel's default body parsing for this API route!
 export const config = {
   api: {
     bodyParser: false,
@@ -12,7 +11,6 @@ export const config = {
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2023-10-16' });
 const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);
 
-// Helper: Read raw buffer for signature validation
 async function getRawBody(req) {
   const chunks = [];
   for await (const chunk of req) {
@@ -21,20 +19,11 @@ async function getRawBody(req) {
   return Buffer.concat(chunks);
 }
 
-// Helper: Calculate next billing anchor date (1st or 15th)
 function getNextAnchorDate(anchorDay) {
   const now = new Date();
-  let next;
-  if (anchorDay === 15) {
-    next = now.getDate() >= 15
-      ? new Date(now.getFullYear(), now.getMonth() + 1, 15)
-      : new Date(now.getFullYear(), now.getMonth(), 15);
-  } else {
-    next = now.getDate() >= 1
-      ? new Date(now.getFullYear(), now.getMonth() + 1, 1)
-      : new Date(now.getFullYear(), now.getMonth(), 1);
-  }
-  return next;
+  return anchorDay === 15
+    ? new Date(now.getFullYear(), now.getMonth() + (now.getDate() >= 15 ? 1 : 0), 15)
+    : new Date(now.getFullYear(), now.getMonth() + (now.getDate() >= 1 ? 1 : 0), 1);
 }
 
 export default async function handler(req, res) {
@@ -51,7 +40,7 @@ export default async function handler(req, res) {
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  // Handle checkout.session.completed
+  // ✅ Handle initial payment success
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
 
@@ -63,22 +52,19 @@ export default async function handler(req, res) {
         const record = await base('Signup Queue').find(recordId);
         const customerId = session.customer;
         const priceId = record.fields['Stripe PRICE_ID'];
-        const couponId = (record.fields['Stripe Coupon ID'] || [])[0] || undefined;
+        const couponId = (record.fields['Stripe Coupon ID'] || [])[0];
         const billingAnchor = Number(record.fields['Billing Anchor']) || 1;
 
-        // Update Airtable with Stripe Customer ID and mark initial payment success
         await base('Signup Queue').update(recordId, {
           'Stripe Customer ID': customerId,
           'Initial Payment Status': 'Success',
         });
 
-        // Calculate billing anchor
         const anchorDate = getNextAnchorDate(billingAnchor);
         const anchorUnix = Math.floor(anchorDate.getTime() / 1000);
         const chartCode = (record.fields['Chart of Accounts Code'] || [])[0] || '';
         const chartDescription = (record.fields['Chart of Accounts Full Length'] || [])[0] || '';
 
-        // Create the subscription in Stripe
         await stripe.subscriptions.create({
           customer: customerId,
           items: [{ price: Array.isArray(priceId) ? priceId[0] : priceId }],
@@ -88,7 +74,7 @@ export default async function handler(req, res) {
             airtable_record_id: recordId,
             choir: record.fields['Choir']?.[0] || '',
             chartCode,
-            chartDescription
+            chartDescription,
           },
         });
 
@@ -99,13 +85,12 @@ export default async function handler(req, res) {
     }
   }
 
-  // Handle invoice.created
+  // 📄 Handle invoice.created
   if (event.type === 'invoice.created') {
     const invoice = event.data.object;
     try {
       const customerId = invoice.customer;
       const email = invoice.customer_email || '';
-
       const customer = await stripe.customers.retrieve(customerId);
 
       const phone = customer.phone || '';
@@ -122,11 +107,10 @@ export default async function handler(req, res) {
       let customerRecordId;
       if (customerRecords.length > 0) {
         customerRecordId = customerRecords[0].id;
-
         await base('Customer Record').update(customerRecordId, {
           'Mobile Phone Number': phone,
-          'First Name': firstName || '',
-          'Surname': surname || '',
+          'First Name': firstName,
+          'Surname': surname,
           'Address Line 1': address.line1 || '',
           'Address Line 2': address.line2 || '',
           'Address City': address.city || '',
@@ -137,8 +121,8 @@ export default async function handler(req, res) {
           'Email': email,
           'Stripe Customer_ID': customerId,
           'Mobile Phone Number': phone,
-          'First Name': firstName || '',
-          'Surname': surname || '',
+          'First Name': firstName,
+          'Surname': surname,
           'Address Line 1': address.line1 || '',
           'Address Line 2': address.line2 || '',
           'Address City': address.city || '',
@@ -147,7 +131,6 @@ export default async function handler(req, res) {
         customerRecordId = newCustomer.id;
       }
 
-      // Create invoice record in Stripe Invoices table
       await base('Stripe Invoices').create({
         'Invoice_ID': invoice.id,
         'Invoice Number': invoice.number?.toString() || '',

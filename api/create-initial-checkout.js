@@ -80,7 +80,7 @@ export default async function handler(req, res) {
           quantity: 1
         }
       ],
-      automatic_tax: { enabled: true }, // ✅ Enable automatic tax
+      automatic_tax: { enabled: true },
       customer: finalCustomerId,
       success_url: 'https://somevoices.co.uk/success-initial?session_id={CHECKOUT_SESSION_ID}',
       cancel_url: 'https://somevoices.co.uk/cancelled',
@@ -88,11 +88,9 @@ export default async function handler(req, res) {
         setup_future_usage: 'off_session'
       },
       metadata,
-      customer_update: {
-        address: 'auto',
-        name: 'auto',
-        shipping: 'auto',
-        phone: 'auto'
+      billing_address_collection: 'required',
+      phone_number_collection: {
+        enabled: true
       },
       consent_collection: {
         terms_of_service: 'required'
