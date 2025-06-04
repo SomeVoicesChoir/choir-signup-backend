@@ -2,6 +2,7 @@
 import Stripe from 'stripe';
 import Airtable from 'airtable';
 
+// Disable Vercel's default body parsing for this API route!
 export const config = {
   api: {
     bodyParser: false,
@@ -11,6 +12,7 @@ export const config = {
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2023-10-16' });
 const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);
 
+// Helper: Read raw buffer for signature validation
 async function getRawBody(req) {
   const chunks = [];
   for await (const chunk of req) {
@@ -19,19 +21,16 @@ async function getRawBody(req) {
   return Buffer.concat(chunks);
 }
 
+// Helper: Calculate next billing anchor date (1st or 15th)
 function getNextAnchorDate(anchorDay) {
   const now = new Date();
-  let next;
-  if (anchorDay === 15) {
-    next = now.getDate() >= 15
+  return anchorDay === 15
+    ? now.getDate() >= 15
       ? new Date(now.getFullYear(), now.getMonth() + 1, 15)
-      : new Date(now.getFullYear(), now.getMonth(), 15);
-  } else {
-    next = now.getDate() >= 1
+      : new Date(now.getFullYear(), now.getMonth(), 15)
+    : now.getDate() >= 1
       ? new Date(now.getFullYear(), now.getMonth() + 1, 1)
       : new Date(now.getFullYear(), now.getMonth(), 1);
-  }
-  return next;
 }
 
 export default async function handler(req, res) {
@@ -51,118 +50,133 @@ export default async function handler(req, res) {
   // Handle checkout.session.completed
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
+    if (session.mode !== 'payment') return res.status(200).send('Not a payment session');
 
-    if (session.mode === 'payment') {
-      const recordId = session.metadata?.recordId;
-      if (!recordId) return res.status(200).send('No recordId');
+    const recordId = session.metadata?.recordId;
+    if (!recordId) return res.status(200).send('No recordId');
 
-      let webhookReport = [];
+    let webhookReport = [];
 
-      try {
-        const record = await base('Signup Queue').find(recordId);
-        const customerId = session.customer;
-        const priceId = record.fields['Stripe PRICE_ID'];
-        const couponId = (record.fields['Stripe Coupon ID'] || [])[0] || undefined;
-        const billingAnchor = Number(record.fields['Billing Anchor']) || 1;
+    try {
+      const record = await base('Signup Queue').find(recordId);
+      const customerId = session.customer;
+      const priceId = record.fields['Stripe PRICE_ID'];
+      const couponId = (record.fields['Stripe Coupon ID'] || [])[0] || undefined;
+      const billingAnchor = Number(record.fields['Billing Anchor']) || 1;
 
-        try {
-          await base('Signup Queue').update(recordId, {
-            'Stripe Customer ID': customerId,
-            'Initial Payment Status': 'Success',
-          });
-          webhookReport.push('✅ Stripe customer ID saved');
-        } catch (err) {
-          webhookReport.push(`❌ Error saving customer ID: ${err.message}`);
-        }
-
-        const anchorDate = getNextAnchorDate(billingAnchor);
-        const anchorUnix = Math.floor(anchorDate.getTime() / 1000);
-        const chartCode = (record.fields['Chart of Accounts Code'] || [])[0] || '';
-        const chartDescription = (record.fields['Chart of Accounts Full Length'] || [])[0] || '';
-
-        try {
-          await stripe.subscriptions.create({
-            customer: customerId,
-            items: [{ price: Array.isArray(priceId) ? priceId[0] : priceId }],
-            billing_cycle_anchor: anchorUnix,
-            coupon: couponId,
-            metadata: {
-              airtable_record_id: recordId,
-              choir: record.fields['Choir']?.[0] || '',
-              chartCode,
-              chartDescription
-            },
-          });
-          webhookReport.push('✅ Subscription created');
-        } catch (err) {
-          webhookReport.push(`❌ Subscription error: ${err.message}`);
-        }
-
-        try {
-          const customerRecords = await base('Customer Record').select({
-            filterByFormula: `{Stripe Customer_ID} = '${customerId}'`,
-            maxRecords: 1,
-          }).firstPage();
-
-          if (customerRecords.length > 0) {
-            const customerRecordId = customerRecords[0].id;
-            const choirId = (record.fields['Choir'] || [])[0] || null;
-
-            const membersRecords = await base('Members').select({
-              filterByFormula: `ARRAYJOIN({*Customer Record}) = '${customerRecordId}'`,
-              maxRecords: 1
-            }).firstPage();
-
-            if (membersRecords.length > 0) {
-              const membersRecord = membersRecords[0];
-              const membersRecordId = membersRecord.id;
-
-              const existingChoirs = membersRecord.fields['Choir'] || [];
-              const updatedChoirs = choirId && !existingChoirs.includes(choirId)
-                ? [...existingChoirs, choirId]
-                : existingChoirs;
-
-              await base('Members').update(membersRecordId, {
-                'Choir': updatedChoirs
-              });
-              webhookReport.push('✅ Members record updated');
-            } else {
-              await base('Members').create({
-                'Email': record.fields['Email'] || '',
-                'First Name': record.fields['First Name'] || '',
-                'Surname': record.fields['Surname'] || '',
-                'Mobile Phone Number': record.fields['Mobile Phone Number'] || '',
-                '*Customer Record': [customerRecordId],
-                'Choir': choirId ? [choirId] : []
-              });
-              webhookReport.push('✅ Members record created');
-            }
-          }
-        } catch (err) {
-          webhookReport.push(`❌ Members sync error: ${err.message}`);
-        }
-
-      } catch (err) {
-        webhookReport.push(`🚨 General error: ${err.message}`);
-      }
+      const chartCode = (record.fields['Chart of Accounts Code'] || [])[0] || '';
+      const chartDescription = (record.fields['Chart of Accounts Full Length'] || [])[0] || '';
+      const trackingCode = record.fields['Tracking Code'] || '';
+      const sku = record.fields['SKU'] || '';
+      const choirName = record.fields['Choir Name'] || '';
+      const voicePart = record.fields['Voice Part'] || '';
 
       try {
         await base('Signup Queue').update(recordId, {
-          'Webhook Report': webhookReport.join('\n')
+          'Stripe Customer ID': customerId,
+          'Initial Payment Status': 'Success',
         });
+        webhookReport.push('✅ Stripe customer ID saved');
       } catch (err) {
-        console.error('❌ Failed to write webhook report to Airtable:', err.message);
+        webhookReport.push(`❌ Error saving customer ID: ${err.message}`);
       }
+
+      try {
+        const anchorDate = getNextAnchorDate(billingAnchor);
+        const anchorUnix = Math.floor(anchorDate.getTime() / 1000);
+        const subscription = await stripe.subscriptions.create({
+          customer: customerId,
+          items: [{ price: Array.isArray(priceId) ? priceId[0] : priceId }],
+          billing_cycle_anchor: anchorUnix,
+          coupon: couponId,
+          metadata: {
+            airtable_record_id: recordId,
+            choir: record.fields['Choir']?.[0] || '',
+            chartCode,
+            chartDescription,
+            trackingCode,
+            sku
+          },
+        });
+        webhookReport.push('✅ Subscription created');
+
+        // Save Subscription ID to Customer Record if exists
+        const customerRecords = await base('Customer Record').select({
+          filterByFormula: `{Stripe Customer_ID} = '${customerId}'`,
+          maxRecords: 1,
+        }).firstPage();
+
+        if (customerRecords.length > 0) {
+          const customerRecordId = customerRecords[0].id;
+
+          try {
+            await base('Customer Record').update(customerRecordId, {
+              'Stripe Subscription_ID': subscription.id,
+              'Voice Part': voicePart || '',
+              'Choir Name': choirName || '',
+              'Chart of Accounts Code': chartCode || '',
+              'Tracking Code': trackingCode || '',
+              'SKU': sku || ''
+            });
+            webhookReport.push('✅ Customer Record updated');
+          } catch (err) {
+            webhookReport.push(`❌ Error updating Customer Record: ${err.message}`);
+          }
+
+          // Update or create Members table record
+          const choirId = (record.fields['Choir'] || [])[0] || null;
+          const members = await base('Members').select({
+            filterByFormula: `ARRAYJOIN({*Customer Record}) = '${customerRecordId}'`,
+            maxRecords: 1,
+          }).firstPage();
+
+          if (members.length > 0) {
+            const m = members[0];
+            const choirList = m.fields['Choir'] || [];
+            const updatedChoirList = choirId && !choirList.includes(choirId)
+              ? [...choirList, choirId]
+              : choirList;
+
+            await base('Members').update(m.id, {
+              'Choir': updatedChoirList,
+            });
+            webhookReport.push('✅ Members record updated');
+          } else {
+            await base('Members').create({
+              'Email': record.fields['Email'] || '',
+              'First Name': record.fields['First Name'] || '',
+              'Surname': record.fields['Surname'] || '',
+              'Mobile Phone Number': record.fields['Mobile Phone Number'] || '',
+              '*Customer Record': [customerRecordId],
+              'Choir': choirId ? [choirId] : []
+            });
+            webhookReport.push('✅ Members record created');
+          }
+        }
+      } catch (err) {
+        webhookReport.push(`❌ Subscription/Members sync error: ${err.message}`);
+      }
+
+    } catch (err) {
+      webhookReport.push(`🚨 General error: ${err.message}`);
+    }
+
+    try {
+      await base('Signup Queue').update(recordId, {
+        'Webhook Report': webhookReport.join('\n')
+      });
+    } catch (err) {
+      console.error('❌ Failed to write webhook report:', err.message);
     }
   }
 
-  // Handle invoice.created — UNCHANGED except one fix for Stripe Timestamp
+  // Handle invoice.created
   if (event.type === 'invoice.created') {
     const invoice = event.data.object;
+
     try {
       const customerId = invoice.customer;
       const email = invoice.customer_email || '';
-
       const customer = await stripe.customers.retrieve(customerId);
       const phone = customer.phone || '';
       const name = customer.name || '';
@@ -178,7 +192,6 @@ export default async function handler(req, res) {
       let customerRecordId;
       if (customerRecords.length > 0) {
         customerRecordId = customerRecords[0].id;
-
         await base('Customer Record').update(customerRecordId, {
           'Mobile Phone Number': phone,
           'First Name': firstName || '',
@@ -215,24 +228,21 @@ export default async function handler(req, res) {
         'Invoice Status': invoice.status || '',
       });
 
-      const choirId = (invoice.metadata?.choir || '') || (customerRecords[0]?.fields?.Choir || [])[0] || null;
-
-      const membersRecords = await base('Members').select({
+      const choirId = invoice.metadata?.choir || null;
+      const members = await base('Members').select({
         filterByFormula: `ARRAYJOIN({*Customer Record}) = '${customerRecordId}'`,
-        maxRecords: 1
+        maxRecords: 1,
       }).firstPage();
 
-      if (membersRecords.length > 0) {
-        const membersRecord = membersRecords[0];
-        const membersRecordId = membersRecord.id;
+      if (members.length > 0) {
+        const m = members[0];
+        const choirList = m.fields['Choir'] || [];
+        const updatedChoirList = choirId && !choirList.includes(choirId)
+          ? [...choirList, choirId]
+          : choirList;
 
-        const existingChoirs = membersRecord.fields['Choir'] || [];
-        const updatedChoirs = choirId && !existingChoirs.includes(choirId)
-          ? [...existingChoirs, choirId]
-          : existingChoirs;
-
-        await base('Members').update(membersRecordId, {
-          'Choir': updatedChoirs
+        await base('Members').update(m.id, {
+          'Choir': updatedChoirList,
         });
       } else {
         await base('Members').create({
@@ -245,9 +255,8 @@ export default async function handler(req, res) {
         });
       }
 
-      console.log(`📄 Invoice logged for ${invoice.id}`);
     } catch (err) {
-      console.error('❌ Airtable error logging invoice or updating customer:', err);
+      console.error('❌ Error logging invoice:', err);
     }
   }
 
