@@ -96,12 +96,8 @@ export default async function handler(req, res) {
         terms_of_service: 'required'
       },
       custom_text: {
-        terms_of_service: {
-          message: 'By continuing, you agree to our Membership Policy.',
-          link: {
-            text: 'Read the full policy',
-            url: 'https://somevoices.co.uk/membership-policy'
-          }
+        terms_of_service_acceptance: {
+          message: 'By continuing, you agree to our <a href="https://somevoices.co.uk/membership-policy" target="_blank">Membership Policy</a>.'
         }
       }
     };
