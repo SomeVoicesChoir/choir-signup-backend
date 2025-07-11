@@ -1,204 +1,5 @@
 <!-- Some Voices Membership Signup Form -->
 
-<!-- Loading Overlay -->
-<div id="loading-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(255,255,255,0.85); z-index:9999; align-items:center; justify-content:center;">
-  <div style="display:flex; flex-direction:column; align-items:center;">
-    <div class="spinner" style="margin-bottom:20px;">
-      <div class="spinner-circle"></div>
-    </div>
-    <div id="loading-text" style="font-size:1.5em; font-weight:bold;">Processing membership – please wait…</div>
-  </div>
-</div>
-
-<form id="email-check-form">
-  <label>Enter your email:<br><input type="email" id="email-input" required /></label><br>
-  <button type="submit">Check Email</button>
-</form>
-
-<div id="welcome-message" style="display:none; font-weight:bold; margin:15px 0;"></div>
-
-<form id="membership-form" style="display:none; margin-top:20px;">
-  <input type="hidden" id="currency" />
-  <input type="hidden" id="stripe-customer-id" />
-  <label>First Name:<br><input type="text" id="first-name-input" required /></label><br>
-  <label>Surname:<br><input type="text" id="surname-input" required /></label><br>
-  <label>Choose your choir:<br><select id="choir-select" required></select></label><br>
-  <label>Choose your voice part:<br><select id="voice-part-select" required></select></label><br>
-  <label>Billing Date:<br><select id="billing-anchor-select"><option value="1">1st</option><option value="15">15th</option></select></label><br>
-  <label>Discount Code:<br><input type="text" id="discount-code-input" placeholder="e.g. WELCOME10" /></label><br>
-  <div id="discount-error" style="color:red; display:none;"></div>
-  <button type="submit">Join Now</button>
-</form>
-
-<script>
-const API = {
-  getChoirs: 'https://choir-signup-backend.vercel.app/api/get-choirs',
-  getVoiceParts: 'https://choir-signup-backend.vercel.app/api/get-voice-parts',
-  lookupEmail: 'https://choir-signup-backend.vercel.app/api/lookup-email',
-  createAirtable: 'https://choir-signup-backend.vercel.app/api/create-airtable-record-step1',
-  createInitialCheckout: 'https://choir-signup-backend.vercel.app/api/create-initial-checkout',
-  checkDiscountCode: 'https://choir-signup-backend.vercel.app/api/check-discount-code',
-};
-
-let choirMap = {};
-
-async function loadChoirs(selectedName = '') {
-  const res = await fetch(API.getChoirs);
-  const data = await res.json();
-  const select = document.getElementById('choir-select');
-  select.innerHTML = '<option value="">Please select a choir</option>';
-  
-  // 🔥 Ensure data.records is used and name is properly fetched
-  (data.records || []).forEach(record => {
-    const choirName = record.name || record.fields?.Name; // fallback to fields.Name if needed
-    const option = document.createElement('option');
-    option.value = record.id;
-    option.textContent = choirName;
-    if (choirName === selectedName) option.selected = true;
-    select.appendChild(option);
-    choirMap[record.id] = record;
-  });
-}
-
-async function loadVoiceParts(selected = '') {
-  const res = await fetch(API.getVoiceParts);
-  const data = await res.json();
-  const select = document.getElementById('voice-part-select');
-  select.innerHTML = '<option value="">Please select your voice part</option>';
-  data.voiceParts.forEach(part => {
-    const option = document.createElement('option');
-    option.value = part.name;
-    option.textContent = part.name;
-    if (part.name === selected) option.selected = true;
-    select.appendChild(option);
-  });
-}
-
-async function checkEmail(email) {
-  const res = await fetch(API.createAirtable, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email })
-  });
-  return await res.json();
-}
-
-async function checkDiscountCodeValid(code) {
-  if (!code) return true;
-  const res = await fetch(API.checkDiscountCode, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code })
-  });
-  const data = await res.json();
-  return !!data.valid;
-}
-
-function showLoadingOverlay(msg) {
-  document.getElementById('loading-text').textContent = msg;
-  document.getElementById('loading-overlay').style.display = 'flex';
-}
-function hideLoadingOverlay() {
-  document.getElementById('loading-overlay').style.display = 'none';
-}
-
-document.getElementById('email-check-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const email = document.getElementById('email-input').value.trim();
-  if (!email) return alert('Enter email');
-  showLoadingOverlay('Checking your email…');
-
-  try {
-    const data = await checkEmail(email);
-    document.getElementById('welcome-message').textContent =
-      data.found ? `Welcome back ${data.firstName || 'friend'}!` : 'Welcome to Some Voices!';
-    document.getElementById('welcome-message').style.display = 'block';
-    document.getElementById('email-check-form').style.display = 'none';
-    document.getElementById('membership-form').style.display = 'block';
-
-    document.getElementById('first-name-input').value = data.firstName || '';
-    document.getElementById('surname-input').value = data.surname || '';
-    document.getElementById('stripe-customer-id').value = data.stripeCustomerId || '';
-
-    await loadChoirs(data.latestChoir || '');
-    await loadVoiceParts(data.voicePart || '');
-  } catch (err) {
-    alert(`Error: ${err.message}`);
-  } finally {
-    hideLoadingOverlay();
-  }
-});
-
-document.getElementById('choir-select').addEventListener('change', function () {
-  const choirId = this.value;
-  const choir = choirMap[choirId] || {};
-  let currencyRaw = choir["Stripe 'default_price_data[currency]'"] || choir.currency || '';
-  let currency = Array.isArray(currencyRaw) ? (currencyRaw[0] || '').toLowerCase() : (currencyRaw || '').toLowerCase();
-  document.getElementById('currency').value = currency || '';
-});
-
-document.getElementById('membership-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  showLoadingOverlay('Processing your membership…');
-
-  const discountCode = document.getElementById('discount-code-input').value.trim();
-  const choirId = document.getElementById('choir-select').value;
-  const currency = document.getElementById('currency').value;
-
-  if (currency !== 'gbp') {
-    alert('Currently, only GBP choirs with card payment are supported for instant sign-up.');
-    hideLoadingOverlay();
-    return;
-  }
-
-  if (discountCode) {
-    const isValid = await checkDiscountCodeValid(discountCode);
-    if (!isValid) {
-      document.getElementById('discount-error').style.display = 'block';
-      document.getElementById('discount-error').textContent = 'Discount Code Not Valid';
-      hideLoadingOverlay();
-      return;
-    }
-  }
-
-  const payload = {
-    email: document.getElementById('email-input').value.trim(),
-    firstName: document.getElementById('first-name-input').value.trim(),
-    surname: document.getElementById('surname-input').value.trim(),
-    choir: choirId,
-    voicePart: document.getElementById('voice-part-select').value,
-    billingAnchor: document.getElementById('billing-anchor-select').value,
-    currency,
-    discountCode,
-    stripeCustomerId: document.getElementById('stripe-customer-id').value
-  };
-
-  try {
-    const res = await fetch(API.createAirtable, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const result = await res.json();
-    if (!res.ok || !result.recordId) throw new Error('Signup record creation failed');
-
-    const checkoutRes = await fetch(API.createInitialCheckout, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ recordId: result.recordId })
-    });
-    const checkoutData = await checkoutRes.json();
-    if (!checkoutRes.ok || !checkoutData.url) throw new Error('Failed to start Stripe Checkout');
-
-    window.location.href = checkoutData.url;
-  } catch (err) {
-    alert(`Submission failed: ${err.message}`);
-  } finally {
-    hideLoadingOverlay();
-  }
-});
-</script>
-
 <style>
 #membership-form label, #email-check-form label {
   display: block;
@@ -248,3 +49,223 @@ document.getElementById('membership-form').addEventListener('submit', async (e) 
   to { transform: rotate(360deg); }
 }
 </style>
+
+<!-- Loading Overlay -->
+<div id="loading-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(255,255,255,0.85); z-index:9999; align-items:center; justify-content:center;">
+  <div style="display:flex; flex-direction:column; align-items:center;">
+    <div class="spinner" style="margin-bottom:20px;">
+      <div class="spinner-circle"></div>
+    </div>
+    <div id="loading-text" style="font-size:1.5em; font-weight:bold;">Processing membership – please wait…</div>
+  </div>
+</div>
+
+<form id="email-check-form">
+  <label>Enter your email:<br><input type="email" id="email-input" required /></label><br>
+  <button type="submit">Check Email</button>
+</form>
+
+<div id="welcome-message" style="display:none; font-weight:bold; margin:15px 0;"></div>
+
+<form id="membership-form" style="display:none; margin-top:20px;">
+  <input type="hidden" id="currency" name="currency" />
+  <input type="hidden" id="stripe-customer-id" name="stripe_customer-id"/>
+  <input type="hidden" id="priceId" name="priceId" />
+  <input type="hidden" id="unitAmount" name="unitAmount" />
+  <input type="hidden" id="chartCode" name="chartCode" />
+
+  <label>First Name:<br><input type="text" id="first-name-input" required name="first-name" /></label><br>
+  <label>Surname:<br><input type="text" id="surname-input" required name="surname" /></label><br>
+  <label>Choose your choir:<br><select id="choir-select" required name="choir"></select></label><br>
+  <label>Choose your voice part:<br><select id="voice-part-select" required name="voice-part"></select></label><br>
+  <label>Billing Date:<br><select id="billing-anchor-select" name="billing-date"><option value="1">1st</option><option value="15">15th</option></select></label><br>
+  <label>Discount Code:<br><input type="text" id="discount-code-input" placeholder="e.g. WELCOME10" name="discount-code" /></label><br>
+  <div id="discount-error" style="color:red; display:none;"></div>
+  <button type="submit">Join Now</button>
+</form>
+
+<script>
+// const APP_URL = "http://localhost:3001";
+const APP_URL = "https://choir-signup-backend-atuj.vercel.app";
+const API = {
+  getChoirs: `${APP_URL}/api/get-choirs`,
+  getVoiceParts: `${APP_URL}/api/get-voice-parts`,
+  lookupEmail: `${APP_URL}/api/lookup-email`,
+  createAirtable: `${APP_URL}/api/create-airtable-record-step1`,
+  createInitialCheckout: `${APP_URL}/api/create-initial-checkout`,
+  checkDiscountCode: `${APP_URL}/api/check-discount-code`,
+};
+
+let choirMap = {};
+
+async function loadChoirs(selectedName = '') {
+  const res = await fetch(API.getChoirs);
+  const data = await res.json();
+  const select = document.getElementById('choir-select');
+  select.innerHTML = '<option value="">Please select a choir</option>';
+  
+  // 🔥 Ensure data.records is used and name is properly fetched
+  (data.records || []).forEach(record => {
+    const choirName = record.name || record.fields?.Name; // fallback to fields.Name if needed
+    const option = document.createElement('option');
+    option.value = record.id;
+    option.dataset.currency =  record.currency || 'gbp';
+    option.dataset.priceId = record.priceId;
+    option.dataset.price = record.unitAmount;
+    option.dataset.chartCode = record.chartCode;
+    option.textContent = choirName;
+    if (choirName === selectedName)
+    {
+      option.selected = true;
+      document.getElementById('currency').value = record.currency || 'gbp';
+      document.getElementById('priceId').value = record.priceId || '';
+      document.getElementById('unitAmount').value = record.unitAmount || '';
+      document.getElementById('chartCode').value = record.chartCode || '';
+
+    }
+
+    select.appendChild(option);
+    choirMap[record.id] = record;
+  });
+}
+
+async function loadVoiceParts(selected = '') {
+  const res = await fetch(API.getVoiceParts);
+  const data = await res.json();
+  const select = document.getElementById('voice-part-select');
+  select.innerHTML = '<option value="">Please select your voice part</option>';
+  data.voiceParts.forEach(part => {
+    const option = document.createElement('option');
+    option.value = part.name;
+    option.textContent = part.name;
+    if (part.name === selected) option.selected = true;
+    select.appendChild(option);
+  });
+}
+
+async function checkEmail(email) {
+  const res = await fetch(API.lookupEmail, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email })
+  });
+  return await res.json();
+}
+
+async function checkDiscountCodeValid(code) {
+  if (!code) return true;
+  const res = await fetch(API.checkDiscountCode, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code })
+  });
+  const data = await res.json();
+  return !!data.valid;
+}
+
+function showLoadingOverlay(msg) {
+  document.getElementById('loading-text').textContent = msg;
+  document.getElementById('loading-overlay').style.display = 'flex';
+}
+function hideLoadingOverlay() {
+  document.getElementById('loading-overlay').style.display = 'none';
+}
+
+document.getElementById('email-check-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('email-input').value.trim();
+  if (!email) return alert('Enter email');
+  showLoadingOverlay('Checking your email…');
+
+  try {
+    const data = await checkEmail(email);
+    document.getElementById('welcome-message').textContent =
+    data.found ? `Welcome back ${data.firstName || 'friend'}!` : 'Welcome to Some Voices!';
+    document.getElementById('welcome-message').style.display = 'block';
+    document.getElementById('email-check-form').style.display = 'none';
+    document.getElementById('membership-form').style.display = 'block';
+
+    document.getElementById('first-name-input').value = data.firstName || '';
+    document.getElementById('surname-input').value = data.surname || '';
+    document.getElementById('stripe-customer-id').value = data.stripeCustomerId || '';
+
+    await loadChoirs(data.latestChoir || '');
+    await loadVoiceParts(data.voicePart || '');
+  } catch (err) {
+    alert(`Error: ${err.message}`);
+  } finally {
+    hideLoadingOverlay();
+  }
+});
+
+document.getElementById('choir-select').addEventListener('change', function () {
+  const choirId = this.value;
+  const choir = choirMap[choirId] || {};
+  document.getElementById('currency').value = choir.currency || '';
+  document.getElementById('priceId').value = choir.priceId || '';
+  document.getElementById('unitAmount').value = choir.unitAmount || '';
+  document.getElementById('chartCode').value = choir.chartCode || '';
+});
+
+document.getElementById('membership-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  showLoadingOverlay('Processing your membership…');
+
+  // all the form value retrievals not by id by whole form serialization
+  const formData = new FormData(e.target);
+  const formValues = Object.fromEntries(formData.entries());
+  const form = document.getElementById('membership-form');
+
+  const discountCode = formValues['discount-code'] || '';
+  const choirId = formValues['choir'] || '';
+  const currency = formValues['currency'] || '';
+
+
+  if (discountCode) {
+    const isValid = await checkDiscountCodeValid(discountCode);
+    if (!isValid) {
+      document.getElementById('discount-error').style.display = 'block';
+      document.getElementById('discount-error').textContent = 'Discount Code Not Valid';
+      hideLoadingOverlay();
+      return;
+    }
+  }
+
+  const payload = {
+    email: document.getElementById('email-input').value.trim(),
+    firstName: document.getElementById('first-name-input').value.trim(),
+    surname: document.getElementById('surname-input').value.trim(),
+    choir: choirId,
+    voicePart: formValues['voice-part'] || '',
+    billingAnchor: formValues['billing-date'] || '',
+    currency,
+    discountCode,
+    stripeCustomerId: formValues['stripe_customer-id'] || ''
+  };
+
+  try {
+    const res = await fetch(API.createAirtable, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const result = await res.json();
+    if (!res.ok || !result.recordId) throw new Error('Signup record creation failed');
+
+    
+    const checkoutRes = await fetch(API.createInitialCheckout, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recordId: result.recordId, priceId: formValues['priceId'], discountCode })
+    });
+    const checkoutData = await checkoutRes.json();
+    if (!checkoutRes.ok || !checkoutData.url) throw new Error('Failed to start Stripe Checkout');
+
+    window.location.href = checkoutData.url;
+  } catch (err) {
+    alert(`Submission failed: ${err.message}`);
+  } finally {
+    hideLoadingOverlay();
+  }
+});
+</script>

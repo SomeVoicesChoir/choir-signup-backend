@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import Airtable from 'airtable';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const app_url = process.env.APP_URL || 'https://choir-signup-backend-atuj.vercel.app';
 const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);
 
 export default async function handler(req, res) {
@@ -13,12 +14,16 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { recordId } = req.body;
+  const { recordId, priceId, discountCode } = req.body;
   if (!recordId) return res.status(400).json({ error: 'Missing recordId' });
+  if (!priceId) return res.status(400).json({ error: 'Missing priceId' });
 
   try {
+
+    // success page link
     const record = await base('Signup Queue').find(recordId);
 
+    console.log('Creating checkout session for record:', record);
     const email = record.fields['Email'];
     const existingCustomerId = record.fields['Stripe Customer ID'] || undefined;
 
@@ -42,29 +47,62 @@ export default async function handler(req, res) {
       chartDescription: (record.fields['Chart of Accounts Full Length'] || [])[0] || ''
     };
 
+    console.log('Customer ID:', metadata);
+
     let payment_method_types = ['card'];
     if (currency === 'eur') {
       payment_method_types = ['card', 'ideal', 'sepa_debit'];
     }
 
-    // Ensure a Stripe customer exists
+    // Validate existing customer ID with Stripe
     let finalCustomerId = existingCustomerId;
-
-    if (!finalCustomerId && email) {
-      const customer = await stripe.customers.create({
-        email,
-        name: `${record.fields['First Name'] || ''} ${record.fields['Surname'] || ''}`.trim(),
-        metadata: {
-          airtable_record_id: recordId
+    if (finalCustomerId) {
+      try {
+        // Verify customer exists in Stripe
+        const customer = await stripe.customers.retrieve(finalCustomerId);
+        if (!customer || customer.deleted) {
+          console.log('Customer not found or deleted, creating new:', finalCustomerId);
+          finalCustomerId = undefined; // Reset to create new customer
         }
-      });
-      finalCustomerId = customer.id;
-
-      await base('Signup Queue').update(recordId, {
-        'Stripe Customer ID': finalCustomerId
-      });
+      } catch (stripeErr) {
+        if (stripeErr.code === 'resource_missing') {
+          console.log('Invalid customer ID, creating new:', finalCustomerId);
+          finalCustomerId = undefined; // Reset to create new customer
+        } else {
+          throw stripeErr; // Re-throw other Stripe errors
+        }
+      }
     }
 
+    // Create new customer if needed
+    if (!finalCustomerId && email) {
+      try {
+        const customer = await stripe.customers.create({
+          email,
+          name: `${record.fields['First Name'] || ''} ${record.fields['Surname'] || ''}`.trim(),
+          metadata: {
+            airtable_record_id: recordId
+          }
+        });
+        finalCustomerId = customer.id;
+
+        // Update Airtable with new customer ID
+        await base('Signup Queue').update(recordId, {
+          'Stripe Customer ID': finalCustomerId
+        });
+        
+        console.log('Created new customer:', finalCustomerId);
+      } catch (createError) {
+        console.error('Failed to create customer:', createError);
+        throw createError;
+      }
+    }
+
+    if (!finalCustomerId) {
+      throw new Error('Unable to create or validate customer');
+    }
+
+    const successUrl = `${app_url}/api/create-success-subscription?session_id={CHECKOUT_SESSION_ID}&recordId=${recordId}&customer=${finalCustomerId}&priceId=${priceId}${discountCode}`;
     const sessionPayload = {
       mode: 'payment',
       payment_method_types,
@@ -82,7 +120,7 @@ export default async function handler(req, res) {
       ],
       automatic_tax: { enabled: true },
       customer: finalCustomerId,
-      success_url: 'https://somevoices.co.uk/success-initial?session_id={CHECKOUT_SESSION_ID}',
+      success_url: successUrl,
       cancel_url: 'https://somevoices.co.uk/cancelled',
       payment_intent_data: {
         setup_future_usage: 'off_session'
@@ -97,14 +135,26 @@ export default async function handler(req, res) {
       },
       customer_update: {
         address: 'auto'
-      }
+      },
     };
 
     const session = await stripe.checkout.sessions.create(sessionPayload);
 
     res.status(200).json({ url: session.url });
   } catch (error) {
-    console.error('Stripe error:', error);
-    res.status(500).json({ error: 'Failed to create checkout session' });
+      const errorMessage = error instanceof Stripe.errors.StripeError 
+      ? error.message 
+      : 'Failed to create checkout session';
+
+      console.error('Detailed error:', {
+        message: error.message,
+        stack: error.stack,
+        data: req.body
+      });
+
+    res.status(500).json({ 
+      error: errorMessage,
+      code: error.code || 'UNKNOWN_ERROR'
+    });
   }
 }
