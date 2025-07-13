@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { recordId, priceId, discountCode } = req.body;
+  const { recordId, priceId, discountCode, billing_date } = req.body;
   if (!recordId) return res.status(400).json({ error: 'Missing recordId' });
   if (!priceId) return res.status(400).json({ error: 'Missing priceId' });
 
@@ -102,7 +102,7 @@ export default async function handler(req, res) {
       throw new Error('Unable to create or validate customer');
     }
 
-    const successUrl = `${app_url}/api/create-success-subscription?session_id={CHECKOUT_SESSION_ID}&recordId=${recordId}&customer=${finalCustomerId}&priceId=${priceId}${discountCode}`;
+    const successUrl = `${app_url}/api/create-success-subscription?session_id={CHECKOUT_SESSION_ID}&recordId=${recordId}&customer=${finalCustomerId}&priceId=${priceId}&discountCode=${discountCode}&billing_date=${billing_date}`;
     const sessionPayload = {
       mode: 'payment',
       payment_method_types,

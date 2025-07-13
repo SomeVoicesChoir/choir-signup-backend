@@ -4,6 +4,27 @@ import Airtable from 'airtable';
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);
 
+function getBillingAnchorTimestamp(billing_date) {
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+  
+  // Parse billing_date (expecting format like "1st" or "15th" or just "1" or "15")
+  const dayOfMonth = parseInt(billing_date.replace(/\D/g, ''));
+  
+  // Create billing date for next month
+  let billingDate = new Date(currentYear, currentMonth + 1, dayOfMonth);
+  
+  // If the billing date is in the past or too close (within 7 days), move to next month
+  const sevenDaysFromNow = new Date(now.getTime() + (7 * 24 * 60 * 60 * 1000));
+  if (billingDate <= sevenDaysFromNow) {
+    billingDate = new Date(currentYear, currentMonth + 2, dayOfMonth);
+  }
+  
+  // Return as Unix timestamp
+  return Math.floor(billingDate.getTime() / 1000);
+}
+
 export default async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -14,7 +35,7 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   // Change from req.body to req.query since this is a GET request
-  const { session_id, recordId, priceId, discountCode, customer } = req.query;
+  const { session_id, recordId, priceId, discountCode, customer, billing_date } = req.query;
 
   if (!session_id) return res.status(400).json({ error: 'Missing session_id' });
   if (!priceId) return res.status(400).json({ error: 'Missing priceId' });
@@ -43,19 +64,23 @@ export default async function handler(req, res) {
       }
     });
 
-    // 4. Create subscription with immediate charging
+    // 4. Create subscription with billing anchor
     let subscriptionData = {
       customer: customerId,
       items: [{ price: priceId }],
-      default_payment_method: paymentMethodId,  // Use the payment method from initial payment
+      default_payment_method: paymentMethodId,
       payment_settings: {
         payment_method_types: ['card'],
         save_default_payment_method: 'on_subscription'
       },
+      // Set billing anchor to charge on specific date it would be 1 or 15 of next month
+      billing_cycle_anchor: getBillingAnchorTimestamp(billing_date),
+      proration_behavior: 'none', // Don't prorate the first invoice
       metadata: {
         ...session.metadata,
         recordId: recordId || '',
-        discountCode: discountCode || ''
+        discountCode: discountCode || '',
+        billing_date: billing_date || ''
       },
       expand: ['latest_invoice.payment_intent']
     };
