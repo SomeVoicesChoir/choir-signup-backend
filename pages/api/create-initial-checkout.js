@@ -55,47 +55,31 @@ export default async function handler(req, res) {
     }
 
     // Validate existing customer ID with Stripe
-    let finalCustomerId = existingCustomerId;
-    if (finalCustomerId) {
-      try {
-        // Verify customer exists in Stripe
-        const customer = await stripe.customers.retrieve(finalCustomerId);
-        if (!customer || customer.deleted) {
-          console.log('Customer not found or deleted, creating new:', finalCustomerId);
-          finalCustomerId = undefined; // Reset to create new customer
-        }
-      } catch (stripeErr) {
-        if (stripeErr.code === 'resource_missing') {
-          console.log('Invalid customer ID, creating new:', finalCustomerId);
-          finalCustomerId = undefined; // Reset to create new customer
+    let finalCustomerId = '';
+      if (email) {
+        // Verify customer id base on email
+        const customers = await stripe.customers.list({
+          email: email,
+          limit: 1
+        });
+        if (customers.data.length > 0) {
+          finalCustomerId = customers.data[0].id;
+          console.log('Found existing customer:', finalCustomerId);
         } else {
-          throw stripeErr; // Re-throw other Stripe errors
+          const customer = await stripe.customers.create({
+            email,
+            name: `${record.fields['First Name'] || ''} ${record.fields['Surname'] || ''}`.trim(),
+            metadata: {
+              airtable_record_id: recordId
+            }
+          });
+          finalCustomerId = customer.id;
+          // Update Airtable with new customer ID
+          await base('Signup Queue').update(recordId, {
+            'Stripe Customer ID': finalCustomerId
+          });
+          console.log('Created new customer:', finalCustomerId);
         }
-      }
-    }
-
-    // Create new customer if needed
-    if (!finalCustomerId && email) {
-      try {
-        const customer = await stripe.customers.create({
-          email,
-          name: `${record.fields['First Name'] || ''} ${record.fields['Surname'] || ''}`.trim(),
-          metadata: {
-            airtable_record_id: recordId
-          }
-        });
-        finalCustomerId = customer.id;
-
-        // Update Airtable with new customer ID
-        await base('Signup Queue').update(recordId, {
-          'Stripe Customer ID': finalCustomerId
-        });
-        
-        console.log('Created new customer:', finalCustomerId);
-      } catch (createError) {
-        console.error('Failed to create customer:', createError);
-        throw createError;
-      }
     }
 
     if (!finalCustomerId) {

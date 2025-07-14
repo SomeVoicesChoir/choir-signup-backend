@@ -8,20 +8,17 @@ function getBillingAnchorTimestamp(billing_date) {
   const now = new Date();
   const currentMonth = now.getMonth();
   const currentYear = now.getFullYear();
+  const currentDay = now.getDate();
   
   // Parse billing_date (expecting format like "1st" or "15th" or just "1" or "15")
   const dayOfMonth = parseInt(billing_date.replace(/\D/g, ''));
-  
-  // Create billing date for next month
-  let billingDate = new Date(currentYear, currentMonth + 1, dayOfMonth);
-  
-  // If the billing date is in the past or too close (within 7 days), move to next month
-  const sevenDaysFromNow = new Date(now.getTime() + (7 * 24 * 60 * 60 * 1000));
-  if (billingDate <= sevenDaysFromNow) {
-    billingDate = new Date(currentYear, currentMonth + 2, dayOfMonth);
+  let billingDate;
+  // if the billing date is passed then change the month
+  if (currentDay > dayOfMonth) {
+      billingDate = new Date(currentYear, currentMonth + 1, dayOfMonth);
+  }else {
+      billingDate = new Date(currentYear, currentMonth, dayOfMonth);
   }
-  
-  // Return as Unix timestamp
   return Math.floor(billingDate.getTime() / 1000);
 }
 
@@ -54,7 +51,7 @@ export default async function handler(req, res) {
       });
     }
 
-    const customerId = session.customer.id;
+    const customerId = customer;
     const paymentMethodId = session.payment_intent.payment_method;
 
     // 3. Set default payment method for future payments
@@ -110,6 +107,10 @@ export default async function handler(req, res) {
       stack: error.stack,
       sessionId: session_id
     });
-    res.redirect(302, `https://somevoices.co.uk/cancelled?error=${encodeURIComponent(error.message)}`);
+    res.status(500).json({
+      error: 'Failed to create success subscription',
+      message: error.message
+    });
+    // res.redirect(302, `https://somevoices.co.uk/cancelled?error=${encodeURIComponent(error.message)}`);
   }
 }
