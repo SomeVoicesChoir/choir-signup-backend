@@ -14,7 +14,7 @@ function getBillingAnchorTimestamp(billing_date) {
   const dayOfMonth = parseInt(billing_date.replace(/\D/g, ''));
   let billingDate;
   // if the billing date is passed then change the month
-  if (currentDay > dayOfMonth) {
+  if (currentDay > dayOfMonth || currentDay === dayOfMonth) {
       billingDate = new Date(currentYear, currentMonth + 1, dayOfMonth);
   }else {
       billingDate = new Date(currentYear, currentMonth, dayOfMonth);
@@ -84,9 +84,39 @@ export default async function handler(req, res) {
 
     // Add discount if provided
     if (discountCode) {
-      const coupon = await stripe.coupons.retrieve(discountCode);
-      if (coupon) {
-        subscriptionData.coupon = discountCode;
+      try {
+        // First try to retrieve as a coupon
+        const coupon = await stripe.coupons.retrieve(discountCode);
+        if (coupon) {
+          subscriptionData.coupon = discountCode;
+          console.log('Applied coupon:', discountCode);
+        }
+      } catch (couponError) {
+        try {
+          // If coupon fails, try as promotion code
+          const promotionCodes = await stripe.promotionCodes.list({
+            code: discountCode,
+            limit: 1
+          });
+          
+          if (promotionCodes.data.length > 0) {
+            const promotionCode = promotionCodes.data[0];
+            if (promotionCode.active) {
+              // Use discounts array instead of promotion_code
+              subscriptionData.discounts = [{
+                promotion_code: promotionCode.id
+              }];
+              console.log('Applied promotion code:', promotionCode.id);
+            } else {
+              console.log('Promotion code is inactive:', discountCode);
+            }
+          } else {
+            console.log('No valid discount found for code:', discountCode);
+          }
+        } catch (promoError) {
+          console.error('Error applying discount:', promoError.message);
+          // Don't throw error, just continue without discount
+        }
       }
     }
 
