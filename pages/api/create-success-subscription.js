@@ -124,9 +124,9 @@ export default async function handler(req, res) {
     
     const subscription = await stripe.subscriptions.create(subscriptionData);
 
-    const session_url = `https://somevoices.co.uk/successed`;
+    const session_url = `https://somevoices.co.uk/success`;
 
-    res.redirect(302, `https://somevoices.co.uk/successed?` + 
+    res.redirect(302, `https://somevoices.co.uk/success?` + 
       `subscriptionId=${subscription.id}&` +
       `status=${subscription.status}`
     );
