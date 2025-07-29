@@ -44,7 +44,10 @@ export default async function handler(req, res) {
       firstName: record.fields['First Name'] || '',
       surname: record.fields['Surname'] || '',
       chartCode: (record.fields['Chart of Accounts Code'] || [])[0] || '',
-      chartDescription: (record.fields['Chart of Accounts Full Length'] || [])[0] || ''
+      chartDescription: (record.fields['Chart of Accounts Full Length'] || [])[0] || '',
+      trackingCode: String(record.fields['Tracking Code'] || ''),
+      sku: String(record.fields['SKU'] || ''),
+      choirName: String(record.fields['Choir Name'] || ''),
     };
 
     console.log('Customer ID:', metadata);
@@ -120,7 +123,14 @@ export default async function handler(req, res) {
       customer_update: {
         address: 'auto'
       },
+      invoice_creation: {
+        enabled: true,
+        invoice_data: {
+          description: 'Initial Pro-Rata Payment'
+        }
+      }
     };
+    console.log('Creating Stripe Checkout session with payload:', sessionPayload);
 
     const session = await stripe.checkout.sessions.create(sessionPayload);
 
@@ -137,7 +147,7 @@ export default async function handler(req, res) {
       });
 
     res.status(500).json({ 
-      error: errorMessage,
+      error: error.message,
       code: error.code || 'UNKNOWN_ERROR'
     });
   }
