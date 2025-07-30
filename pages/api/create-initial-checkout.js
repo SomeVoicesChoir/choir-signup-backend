@@ -7,12 +7,17 @@ import Airtable from 'airtable';
 //   throw new Error('Missing STRIPE_SECRET_KEY environment variable');
 // }
 
-const app_url = process.env.APP_URL || 'https://choir-signup-backend-atuj.vercel.app';
-const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);
 
 export default async function handler(req, res) {
 
-  const stripe = require('stripe')(process.env.STRIPE_SECRET); // Works
+  const app_url = process.env.APP_URL || 'https://choir-signup-backend-atuj.vercel.app';
+  const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);
+
+  const stripe =  new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: '2022-11-15',
+    typescript: true,
+  });
+
   if (!process.env.STRIPE_SECRET) {
     throw new Error('Missing STRIPE_SECRET environment variable');
   }
@@ -21,7 +26,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  // if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { recordId, priceId, discountCode, billing_date } = req.body;
   if (!recordId) return res.status(400).json({ error: 'Missing recordId' });
