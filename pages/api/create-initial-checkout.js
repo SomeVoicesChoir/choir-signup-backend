@@ -6,14 +6,16 @@ import Airtable from 'airtable';
 // if (!process.env.STRIPE_SECRET_KEY) {
 //   throw new Error('Missing STRIPE_SECRET_KEY environment variable');
 // }
-const stripe = require('stripe')(process.env.STRIPE_SECRET); // Works
-if (!process.env.STRIPE_SECRET) {
-  throw new Error('Missing STRIPE_SECRET environment variable');
-}
+
 const app_url = process.env.APP_URL || 'https://choir-signup-backend-atuj.vercel.app';
 const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);
 
 export default async function handler(req, res) {
+
+  const stripe = require('stripe')(process.env.STRIPE_SECRET); // Works
+  if (!process.env.STRIPE_SECRET) {
+    throw new Error('Missing STRIPE_SECRET environment variable');
+  }
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
