@@ -3,7 +3,9 @@ import Stripe from 'stripe';
 import Airtable from 'airtable';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+console.log('Stripe initialized with secret key:', process.env.STRIPE_SECRET_KEY);
 const app_url = process.env.APP_URL || 'https://choir-signup-backend-atuj.vercel.app';
+console.log('App URL:', app_url);
 const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);
 
 export default async function handler(req, res) {

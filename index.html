@@ -60,8 +60,8 @@
   </div>
 </div>
 
-<form id="email-check-form">
-  <label>Enter your email:<br><input type="email" id="email-input" required /></label><br>
+<form id="email-check-form"><br></br>
+  <label>Email Address: (if you have previously been a member, please use the email address associated with your membership):<br><input type="email" id="email-input" required /></label><br>
   <button type="submit">Check Email</button>
 </form>
 
@@ -78,15 +78,41 @@
   <label>Surname:<br><input type="text" id="surname-input" required name="surname" /></label><br>
   <label>Choose your choir:<br><select id="choir-select" required name="choir"></select></label><br>
   <label>Choose your voice part:<br><select id="voice-part-select" required name="voice-part"></select></label><br>
-  <label>Billing Date:<br><select id="billing-anchor-select" name="billing-date"><option value="1">1st</option><option value="15">15th</option></select></label><br>
+  <label>Preferred Billing Date (your membership payment will be taken on either the 1st or 15th each month):<br><select id="billing-anchor-select" name="billing-date"><option value="1">1st</option><option value="15">15th</option></select></label><br>
   <label>Discount Code:<br><input type="text" id="discount-code-input" placeholder="e.g. WELCOME10" name="discount-code" /></label><br>
   <div id="discount-error" style="color:red; display:none;"></div>
+
+  <div id="termsBox" style="display:none; border:1px solid #ccc; border-radius:8px; padding:16px; max-height:250px; overflow-y:auto; background-color:#f9f9f9; box-shadow:0 2px 6px rgba(0,0,0,0.1); font-family:Arial, sans-serif; line-height:1.5; position:relative; margin-top:20px;">
+    <h3>Terms of Service</h3>
+    <p>Welcome to Some Voices. By joining our community, you agree to abide by these terms and conditions, which govern your membership, participation, and conduct.</p>
+    <p>1. Membership is non-transferable and is intended solely for the individual who registers.</p>
+    <p>2. Fees for choir participation must be paid in accordance with the schedule provided during signup or as updated from time to time.</p>
+    <p>3. Refunds are processed in accordance with our refund policy. No refunds will be provided for partial months attended unless explicitly stated otherwise.</p>
+    <p>4. Members are expected to attend rehearsals regularly and notify their choir leader if they cannot attend.</p>
+    <p>5. Some Voices reserves the right to modify choir schedules, locations, or leadership as necessary.</p>
+    <p>6. All members agree to conduct themselves respectfully and inclusively towards other members, leaders, and guests.</p>
+    <p>7. Photography and video recordings may occur during events and rehearsals. By attending, you consent to being included in promotional materials unless you opt out in writing.</p>
+    <p>8. Your personal data will be handled according to our Privacy Policy, available on our website.</p>
+    <p>9. Any form of harassment, bullying, or discrimination will not be tolerated and may result in immediate termination of membership without refund.</p>
+    <p>10. Members must not use the Some Voices name, brand, or materials for personal promotion without explicit permission.</p>
+    <p>11. We reserve the right to revise these terms at any time, with updates communicated via email or our website.</p>
+    <p>12. Continuing your membership after changes to these terms constitutes your acceptance of the new terms.</p>
+    <p>13. For any questions regarding these terms, please contact your choir leader or email us via the contact form on our website.</p>
+    <p>Thank you for being part of Some Voices and contributing to our vibrant musical community!</p>
+
+    <div id="agreeContainer" style="margin-top:20px;">
+     <label style="display: inline-flex; align-items: center; gap: 10px; font-weight: bold;">
+    <span style="white-space: nowrap;">I agree to the Terms of Service</span>
+    <input type="checkbox" id="agreeCheckbox"  style="transform: scale(1.5); cursor: pointer;">
+  </label>
+</div>
+</div>
   <button type="submit">Join Now</button>
 </form>
 
 <script>
-const APP_URL = "http://localhost:3000";
-// const APP_URL = "https://choir-signup-backend-atuj.vercel.app";
+// const APP_URL = "http://localhost:3000";
+const APP_URL = "https://choir-signup-backend-atuj.vercel.app";
 const API = {
   getChoirs: `${APP_URL}/api/get-choirs`,
   getVoiceParts: `${APP_URL}/api/get-voice-parts`,
@@ -184,6 +210,7 @@ document.getElementById('email-check-form').addEventListener('submit', async (e)
     document.getElementById('welcome-message').style.display = 'block';
     document.getElementById('email-check-form').style.display = 'none';
     document.getElementById('membership-form').style.display = 'block';
+    document.getElementById('termsBox').style.display = 'block';
 
     document.getElementById('first-name-input').value = data.firstName || '';
     document.getElementById('surname-input').value = data.surname || '';
@@ -268,4 +295,43 @@ document.getElementById('membership-form').addEventListener('submit', async (e) 
     hideLoadingOverlay();
   }
 });
+
+// Terms scroll and agreement logic
+const termsBox = document.getElementById('termsBox');
+const agreeCheckbox = document.getElementById('agreeCheckbox');
+const joinNowButton = document.querySelector('#membership-form button[type="submit"]');
+
+// Enable checkbox when user scrolls to bottom of terms
+termsBox.addEventListener('scroll', function() {
+  if (termsBox.scrollTop + termsBox.clientHeight >= termsBox.scrollHeight) {
+    agreeCheckbox.disabled = false;
+  }
+});
+
+// Enable submit button when checkbox is checked
+agreeCheckbox.addEventListener('change', function() {
+  joinNowButton.disabled = !this.checked;
+});
+
+// Initially disable the submit button
+joinNowButton.disabled = true;
+
+// Reset functionality (add this where you show the form)
+function resetTermsAndCheckbox() {
+  const termsBox = document.getElementById('termsBox');
+  const agreeCheckbox = document.getElementById('agreeCheckbox');
+  const joinNowButton = document.querySelector('#membership-form button[type="submit"]');
+
+  if (termsBox) {
+    termsBox.scrollTop = 0;
+    termsBox.style.display = 'block';
+  }
+  if (agreeCheckbox) {
+    agreeCheckbox.checked = false;
+    agreeCheckbox.disabled = true;
+  }
+  if (joinNowButton) {
+    joinNowButton.disabled = true;
+  }
+}
 </script>
