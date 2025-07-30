@@ -81,7 +81,7 @@ export default async function handler(req, res) {
           await base('Signup Queue').update(recordId, {
             'Stripe Customer ID': finalCustomerId
           });
-          console.log('Created new customer:', finalCustomerId);
+          console.log('Created new customer :', finalCustomerId);
         }
     }
 
