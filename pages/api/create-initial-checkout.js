@@ -52,9 +52,27 @@ export default async function handler(req, res) {
 
     console.log('Customer ID:', metadata);
 
+    // Configure payment methods and setup based on currency
     let payment_method_types = ['card'];
+    let paymentConfig = {};
+
     if (currency === 'eur') {
-      payment_method_types = ['card', 'ideal', 'sepa_debit'];
+      payment_method_types = ['card'];
+      // For EUR, use payment method options instead
+      paymentConfig = {
+        payment_method_options: {
+          card: {
+            setup_future_usage: 'off_session'
+          }
+        }
+      };
+    } else {
+      // For GBP/USD, use payment_intent_data
+      paymentConfig = {
+        payment_intent_data: {
+          setup_future_usage: 'off_session'
+        }
+      };
     }
 
     // Validate existing customer ID with Stripe
@@ -109,9 +127,7 @@ export default async function handler(req, res) {
       customer: finalCustomerId,
       success_url: successUrl,
       cancel_url: 'https://somevoices.co.uk/cancelled',
-      payment_intent_data: {
-        setup_future_usage: 'off_session'
-      },
+      ...paymentConfig,
       metadata,
       billing_address_collection: 'required',
       phone_number_collection: {
