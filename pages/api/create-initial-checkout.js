@@ -30,6 +30,7 @@ export default async function handler(req, res) {
     const amount = Number(record.fields['Total Cost Initial Invoice'] || 0);
 
     const currencyField = record.fields["Stripe 'default_price_data[currency]'"] || 'gbp';
+    const skipNextMonth = record.fields['Skip Next Month'] || 'No';
     const currency = typeof currencyField === 'string'
       ? currencyField.toLowerCase()
       : Array.isArray(currencyField)
@@ -48,6 +49,7 @@ export default async function handler(req, res) {
       trackingCode: String(record.fields['Tracking Code'] || ''),
       sku: String(record.fields['SKU'] || ''),
       choirName: String(record.fields['Choir Name'] || ''),
+      skipNextMonth: skipNextMonth === 'Yes' ? 'Yes' : 'No',
     };
 
     console.log('Customer ID:', metadata);
@@ -107,7 +109,7 @@ export default async function handler(req, res) {
       throw new Error('Unable to create or validate customer');
     }
 
-    const successUrl = `${app_url}/api/create-success-subscription?session_id={CHECKOUT_SESSION_ID}&recordId=${recordId}&customer=${finalCustomerId}&priceId=${priceId}&discountCode=${discountCode}&billing_date=${billing_date}`;
+    const successUrl = `${app_url}/api/create-success-subscription?session_id={CHECKOUT_SESSION_ID}&recordId=${recordId}&customer=${finalCustomerId}&priceId=${priceId}&discountCode=${discountCode}&billing_date=${billing_date}&skipNextMonth=${skipNextMonth}`;
     const sessionPayload = {
       mode: 'payment',
       payment_method_types,

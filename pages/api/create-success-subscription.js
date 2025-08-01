@@ -4,7 +4,7 @@ import Airtable from 'airtable';
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);
 
-function getBillingAnchorTimestamp(billing_date) {
+function getBillingAnchorTimestamp(billing_date, skipNextMonth) {
   const now = new Date();
   const currentMonth = now.getMonth();
   const currentYear = now.getFullYear();
@@ -14,7 +14,7 @@ function getBillingAnchorTimestamp(billing_date) {
   const dayOfMonth = parseInt(billing_date.replace(/\D/g, ''));
   let billingDate;
   // if the billing date is passed then change the month
-  if (currentDay > dayOfMonth || currentDay === dayOfMonth) {
+  if (currentDay > dayOfMonth || currentDay === dayOfMonth || skipNextMonth === 'Yes') {
       billingDate = new Date(currentYear, currentMonth + 1, dayOfMonth);
   }else {
       billingDate = new Date(currentYear, currentMonth, dayOfMonth);
@@ -32,7 +32,7 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   // Change from req.body to req.query since this is a GET request
-  const { session_id, recordId, priceId, discountCode, customer, billing_date } = req.query;
+  const { session_id, recordId, priceId, discountCode, customer, billing_date, skipNextMonth } = req.query;
 
   if (!session_id) return res.status(400).json({ error: 'Missing session_id' });
   if (!priceId) return res.status(400).json({ error: 'Missing priceId' });
@@ -71,8 +71,11 @@ export default async function handler(req, res) {
         save_default_payment_method: 'on_subscription'
       },
       // Set billing anchor to charge on specific date it would be 1 or 15 of next month
-      billing_cycle_anchor: getBillingAnchorTimestamp(billing_date),
+      // billing_cycle_anchor: getBillingAnchorTimestamp(billing_date, skipNextMonth),
+      // set the trial period to 0
+      trial_end: getBillingAnchorTimestamp(billing_date, skipNextMonth),
       proration_behavior: 'none', // Don't prorate the first invoice
+      automatic_tax: { enabled: true },
       metadata: {
         ...session.metadata,
         recordId: recordId || '',
@@ -137,10 +140,10 @@ export default async function handler(req, res) {
       stack: error.stack,
       sessionId: session_id
     });
-    res.status(500).json({
-      error: 'Failed to create success subscription',
-      message: error.message
-    });
-    // res.redirect(302, `https://somevoices.co.uk/cancelled?error=${encodeURIComponent(error.message)}`);
+    // res.status(500).json({
+    //   error: 'Failed to create success subscription',
+    //   message: error.message
+    // });
+    res.redirect(302, `https://somevoices.co.uk/cancelled?error=${encodeURIComponent(error.message)}`);
   }
 }
