@@ -59,7 +59,7 @@ export default async function handler(req, res) {
     let paymentConfig = {};
 
     if (currency === 'eur') {
-      payment_method_types = ['card'];
+      payment_method_types = ['card', 'ideal'];
       // For EUR, use payment method options instead
       paymentConfig = {
         payment_method_options: {
