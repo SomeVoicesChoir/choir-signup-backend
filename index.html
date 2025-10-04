@@ -82,23 +82,134 @@
   <label>Discount Code:<br><input type="text" id="discount-code-input" placeholder="e.g. WELCOME10" name="discount-code" /></label><br>
   <div id="discount-error" style="color:red; display:none;"></div>
 
+  <!-- Payment Method Selection for EU customers -->
+  <div id="payment-method-selection" style="display: none; margin: 20px 0; padding: 20px; border: 2px solid #e1e5e9; border-radius: 12px; background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%); box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+    <h3 style="margin: 0 0 16px 0; color: #2c3e50; font-size: 1.1em; font-weight: 600; display: flex; align-items: center;">
+      <!-- <span style="margin-right: 8px;">:credit_card:</span> -->
+      Choose Your Payment Method
+    </h3>
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+      <label style="display: flex; align-items: center; padding: 12px 16px; border: 2px solid #e9ecef; border-radius: 8px; background: white; cursor: pointer; transition: all 0.2s ease; position: relative;" 
+             onmouseover="this.style.borderColor='#007bff'; this.style.backgroundColor='#f8f9ff';" 
+             onmouseout="this.style.borderColor='#e9ecef'; this.style.backgroundColor='white';">
+        <input type="radio" name="payment-method" value="card" checked 
+               style="margin-right: 12px; transform: scale(1.2);" 
+               onchange="this.parentElement.style.borderColor='#007bff'; this.parentElement.style.backgroundColor='#f8f9ff';">
+        <div style="width: -webkit-fill-available;">
+          <div style="font-weight: 600; color: #2c3e50; margin-bottom: 2px;"> Credit/Debit Card</div>
+          <div style="font-size: 0.85em; color: #6c757d;">Visa, Mastercard, Amex</div>
+        </div>
+      </label>
+      
+      <label style="display: flex; align-items: center; padding: 12px 16px; border: 2px solid #e9ecef; border-radius: 8px; background: white; cursor: pointer; transition: all 0.2s ease;" 
+             onmouseover="this.style.borderColor='#28a745'; this.style.backgroundColor='#f8fff9';" 
+             onmouseout="this.style.borderColor='#e9ecef'; this.style.backgroundColor='white';">
+        <input type="radio" name="payment-method" value="ideal" 
+               style="margin-right: 12px; transform: scale(1.2);" 
+               onchange="this.parentElement.style.borderColor='#28a745'; this.parentElement.style.backgroundColor='#f8fff9';">
+        <div style="width: -webkit-fill-available;">
+          <div style="font-weight: 600; color: #2c3e50; margin-bottom: 2px;"> iDEAL</div>
+          <div style="font-size: 0.85em; color: #6c757d;">Direct bank payment</div>
+        </div>
+      </label>
+    </div>
+    
+    <!-- <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 6px; padding: 12px; margin-top: 16px;">
+      <p style="margin: 0; font-size: 0.9em; color: #856404; display: flex; align-items: flex-start;">
+        <span style="margin-right: 8px; margin-top: 2px;">:information_source:</span>
+        <span><strong>iDEAL Payment:</strong> Your subscription will be created first, then you'll be redirected to complete the initial payment through your bank.</span>
+      </p>
+    </div> -->
+  </div>
+
   <div id="termsBox" style="display:none; border:1px solid #ccc; border-radius:8px; padding:16px; max-height:250px; overflow-y:auto; background-color:#f9f9f9; box-shadow:0 2px 6px rgba(0,0,0,0.1); font-family:Arial, sans-serif; line-height:1.5; position:relative; margin-top:20px;">
-    <h3>Terms of Service</h3>
-    <p>Welcome to Some Voices. By joining our community, you agree to abide by these terms and conditions, which govern your membership, participation, and conduct.</p>
-    <p>1. Membership is non-transferable and is intended solely for the individual who registers.</p>
-    <p>2. Fees for choir participation must be paid in accordance with the schedule provided during signup or as updated from time to time.</p>
-    <p>3. Refunds are processed in accordance with our refund policy. No refunds will be provided for partial months attended unless explicitly stated otherwise.</p>
-    <p>4. Members are expected to attend rehearsals regularly and notify their choir leader if they cannot attend.</p>
-    <p>5. Some Voices reserves the right to modify choir schedules, locations, or leadership as necessary.</p>
-    <p>6. All members agree to conduct themselves respectfully and inclusively towards other members, leaders, and guests.</p>
-    <p>7. Photography and video recordings may occur during events and rehearsals. By attending, you consent to being included in promotional materials unless you opt out in writing.</p>
-    <p>8. Your personal data will be handled according to our Privacy Policy, available on our website.</p>
-    <p>9. Any form of harassment, bullying, or discrimination will not be tolerated and may result in immediate termination of membership without refund.</p>
-    <p>10. Members must not use the Some Voices name, brand, or materials for personal promotion without explicit permission.</p>
-    <p>11. We reserve the right to revise these terms at any time, with updates communicated via email or our website.</p>
-    <p>12. Continuing your membership after changes to these terms constitutes your acceptance of the new terms.</p>
-    <p>13. For any questions regarding these terms, please contact your choir leader or email us via the contact form on our website.</p>
-    <p>Thank you for being part of Some Voices and contributing to our vibrant musical community!</p>
+<h3>Some Voices Membership Terms & Conditions</h3>
+  <p>Welcome to Some Voices. We want joining Some Voices to be simple, clear and welcoming. Here’s everything you need to know about how membership works.</p>
+
+  <h4>1. Your Membership</h4>
+  <ul>
+    <li>Your membership is just for you – it can’t be transferred to someone else.</li>
+  </ul>
+
+  <h4>2. Fees & Payments</h4>
+  <ul>
+    <li>Each term costs £116 / €130.</li>
+    <li>We spread this over 4 equal monthly payments (£29 / €35).</li>
+    <li>Payments are taken on the 1st or 15th of the month – you choose which when you join.</li>
+    <li>Sometimes your last payment for a term may come after your final rehearsal or performance (this depends on how our term dates work across each year).</li>
+  </ul>
+
+  <h4>3. Our Terms</h4>
+  <ul>
+    <li>We have three terms each year:
+      <ul>
+        <li>Spring: January → April</li>
+        <li>Summer: May → August</li>
+        <li>Winter: September → December</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h4>4. Rolling Membership</h4>
+  <ul>
+    <li>Your membership will automatically continue into the next term unless you tell us you’d like to cancel.</li>
+    <li>If you want to cancel at the end of a term, let us know at least 30 days before your first payment date for the new term.</li>
+  </ul>
+
+  <h4>5. Cancelling Your Membership</h4>
+  <p>You can cancel in two ways:</p>
+  <ul>
+    <li>Leave mid-term – If it’s before your Week 9 rehearsal, members need to give us 30 days’ notice and we’ll end your membership.</li>
+    <li>End-of-term – If you’re staying until the end of the current term but not returning next term, your membership will end automatically after your final payment providing you've given us at least 30 days' notice.</li>
+    <li>After Week 9, only the end-of-term option is available.</li>
+    <li>The cancellation form is available from your monthly invoice, which you’ll receive via email.</li>
+  </ul>
+
+  <h4>6. Member Activation Fee</h4>
+  <ul>
+    <li>There’s a £1 one-off activation fee when you sign up.</li>
+    <li>This gives you instant access to your membership link – with all your music, recordings, lyrics, and term details.</li>
+    <li>You do not need to pay this again as long as you stay a member with us. If you cancel and rejoin, you will need to pay the activation fee again.</li>
+  </ul>
+
+  <h4>7. Free Tasters</h4>
+  <ul>
+    <li>We don’t expect anyone to commit without trying us first – free taster sessions are available.</li>
+  </ul>
+
+  <h4>8. Schedules & Leadership</h4>
+  <ul>
+    <li>Sometimes we may need to change choir schedules, locations, or leaders – we’ll always let you know as early as possible.</li>
+  </ul>
+
+  <h4>9. Being a Member</h4>
+  <ul>
+    <li>Please treat fellow members, leaders, and guests with respect and inclusivity.</li>
+    <li>Any form of harassment, bullying, or discrimination isn’t tolerated and could mean your membership ends immediately with no refund.</li>
+  </ul>
+
+  <h4>10. Photography & Video</h4>
+  <ul>
+    <li>We sometimes take photos and videos at rehearsals or events for promotional purposes.</li>
+    <li>If you’d prefer not to be included, just let us know in writing (details in your member link).</li>
+  </ul>
+
+  <h4>11. Privacy</h4>
+  <ul>
+    <li>We take your personal data seriously and handle it according to our Privacy Policy (available on our website).</li>
+  </ul>
+
+  <h4>12. Using Our Name & Materials</h4>
+  <ul>
+    <li>Please don’t use the Some Voices name, brand, or materials for personal promotion without our permission.</li>
+  </ul>
+
+  <h4>13. Changes to These Terms</h4>
+  <ul>
+    <li>We may update these terms from time to time and will always let you know via email or on our website.</li>
+    <li>Continuing your membership after changes means you accept the updated terms.</li>
+  </ul>
 
     <div id="agreeContainer" style="margin-top:20px;">
      <label style="display: inline-flex; align-items: center; gap: 10px; font-weight: bold;">
@@ -119,10 +230,23 @@ const API = {
   lookupEmail: `${APP_URL}/api/lookup-email`,
   createAirtable: `${APP_URL}/api/create-airtable-record-step1`,
   createInitialCheckout: `${APP_URL}/api/create-initial-checkout`,
+  createSubscriptionFirst: `${APP_URL}/api/create-subscription-first`,
   checkDiscountCode: `${APP_URL}/api/check-discount-code`,
 };
 
 let choirMap = {};
+
+// Helper function to show/hide payment method selection
+function togglePaymentMethodSelection(currency) {
+  const paymentMethodSelection = document.getElementById('payment-method-selection');
+  if (currency === 'eur') {
+    paymentMethodSelection.style.display = 'block';
+  } else {
+    paymentMethodSelection.style.display = 'none';
+    // Reset to card for non-EUR currencies
+    document.querySelector('input[name="payment-method"][value="card"]').checked = true;
+  }
+}
 
 async function loadChoirs(selectedName = '') {
   const res = await fetch(API.getChoirs);
@@ -130,7 +254,7 @@ async function loadChoirs(selectedName = '') {
   const select = document.getElementById('choir-select');
   select.innerHTML = '<option value="">Please select a choir</option>';
   
-  // 🔥 Ensure data.records is used and name is properly fetched
+  // :fire: Ensure data.records is used and name is properly fetched
   (data.records || []).forEach(record => {
     const choirName = record.name || record.fields?.Name; // fallback to fields.Name if needed
     const option = document.createElement('option');
@@ -143,11 +267,14 @@ async function loadChoirs(selectedName = '') {
     if (choirName === selectedName)
     {
       option.selected = true;
-      document.getElementById('currency').value = record.currency || 'gbp';
+      const currencyValue = record.currency || 'gbp';
+      document.getElementById('currency').value = currencyValue;
       document.getElementById('priceId').value = record.priceId || '';
       document.getElementById('unitAmount').value = record.unitAmount || '';
       document.getElementById('chartCode').value = record.chartCode || '';
-
+      
+      // Show payment method selection if EUR
+      togglePaymentMethodSelection(currencyValue);
     }
 
     select.appendChild(option);
@@ -228,10 +355,14 @@ document.getElementById('email-check-form').addEventListener('submit', async (e)
 document.getElementById('choir-select').addEventListener('change', function () {
   const choirId = this.value;
   const choir = choirMap[choirId] || {};
-  document.getElementById('currency').value = choir.currency || '';
+  const currency = choir.currency || '';
+  document.getElementById('currency').value = currency;
   document.getElementById('priceId').value = choir.priceId || '';
   document.getElementById('unitAmount').value = choir.unitAmount || '';
   document.getElementById('chartCode').value = choir.chartCode || '';
+  
+  // Show payment method selection for EUR currency
+  togglePaymentMethodSelection(currency);
 });
 
 document.getElementById('membership-form').addEventListener('submit', async (e) => {
@@ -246,7 +377,7 @@ document.getElementById('membership-form').addEventListener('submit', async (e) 
   const discountCode = formValues['discount-code'] || '';
   const choirId = formValues['choir'] || '';
   const currency = formValues['currency'] || '';
-
+  const paymentMethod = formValues['payment-method'] || 'card';
 
   if (discountCode) {
     const isValid = await checkDiscountCodeValid(discountCode);
@@ -267,7 +398,8 @@ document.getElementById('membership-form').addEventListener('submit', async (e) 
     billingAnchor: formValues['billing-date'] || '',
     currency,
     discountCode,
-    stripeCustomerId: formValues['stripe_customer-id'] || ''
+    stripeCustomerId: formValues['stripe_customer-id'] || '',
+    paymentMethod
   };
 
   try {
@@ -279,16 +411,44 @@ document.getElementById('membership-form').addEventListener('submit', async (e) 
     const result = await res.json();
     if (!res.ok || !result.recordId) throw new Error('Signup record creation failed');
 
-    
-    const checkoutRes = await fetch(API.createInitialCheckout, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ recordId: result.recordId, priceId: formValues['priceId'], discountCode, billing_date: formValues['billing-date'] })
-    });
-    const checkoutData = await checkoutRes.json();
-    if (!checkoutRes.ok || !checkoutData.url) throw new Error('Failed to start Stripe Checkout');
+    // Different flow based on payment method selection
+    if (paymentMethod === 'ideal' && currency === 'eur') {
+      // iDEAL flow: Create subscription first, then initial payment
+      showLoadingOverlay('Creating your subscription and setting up iDEAL payment...');
+      
+      const subscriptionRes = await fetch(API.createSubscriptionFirst, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          recordId: result.recordId, 
+          priceId: 'price_1SEVL9PCfeZm56SKNyRD35x0', 
+          discountCode, 
+          billing_date: formValues['billing-date'],
+          paymentMethod: 'ideal'
+        })
+      });
+      const subscriptionData = await subscriptionRes.json();
+      if (!subscriptionRes.ok || !subscriptionData.checkoutUrl) throw new Error('Failed to create subscription and checkout');
 
-    window.location.href = checkoutData.url;
+      window.location.href = subscriptionData.checkoutUrl;
+    } else {
+      // Standard flow: Initial payment first, then subscription
+      const checkoutRes = await fetch(API.createInitialCheckout, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          recordId: result.recordId, 
+          priceId: formValues['priceId'], 
+          discountCode, 
+          billing_date: formValues['billing-date'],
+          paymentMethod: 'card'
+        })
+      });
+      const checkoutData = await checkoutRes.json();
+      if (!checkoutRes.ok || !checkoutData.url) throw new Error('Failed to start Stripe Checkout');
+
+      window.location.href = checkoutData.url;
+    }
   } catch (err) {
     alert(`Submission failed: ${err.message}`);
   } finally {
