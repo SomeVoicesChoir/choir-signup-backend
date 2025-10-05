@@ -110,6 +110,19 @@ export default async function handler(req, res) {
       payment_method_types = ['card', 'ideal']; // Include both options for EUR, with iDEAL as an option
     }
     
+    const description = record.fields['Initial Payment Description'] || 'Some Voices – Initial Pro-Rata Payment';
+    console.log('Using description:', description);
+
+    // Retrieve the price to get the product ID
+    const price = await stripe.prices.retrieve(priceId, { expand: ['product'] });
+    const productId = typeof price.product === 'string' ? price.product : price.product.id;
+    
+    // Update the product description in Stripe
+    await stripe.products.update(productId, {
+      description: description
+    });
+    console.log('Updated product description in Stripe for product ID:', productId);
+
     // Create a subscription session
     const sessionConfig = {
       customer: finalCustomerId,
