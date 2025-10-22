@@ -104,10 +104,12 @@ export default async function handler(req, res) {
 
     console.log('Creating Stripe hosted subscription page');
     
-    // Configure payment methods based on currency and requested payment method
+    // Configure payment methods based on currency
     let payment_method_types = ['card'];
-    if (currency === 'eur' && paymentMethod === 'ideal') {
-      payment_method_types = ['card', 'ideal']; // Include both options for EUR, with iDEAL as an option
+    
+    // For EUR currency, offer SEPA Direct Debit (supports recurring payments)
+    if (currency === 'eur') {
+      payment_method_types = ['card', 'ideal'];
     }
     
     const description = record.fields['Initial Payment Description'] || 'Some Voices – Initial Pro-Rata Payment';
@@ -123,6 +125,7 @@ export default async function handler(req, res) {
     });
     console.log('Updated product description in Stripe for product ID:', productId);
 
+
     // Create a subscription session
     const sessionConfig = {
       customer: finalCustomerId,
@@ -134,9 +137,21 @@ export default async function handler(req, res) {
           price: priceId,
           quantity: 1,
         },
+        // Add initial payment if amount is greater than 0
+        ...(amount > 0 ? [{
+          price_data: {
+            currency,
+            unit_amount: amount,
+            product_data: {
+              name: `${record.fields['Choir Name'] || ''} - Initial Payment`,
+              description: `${description} (One-time payment)`,
+            },
+          },
+          quantity: 1,
+        }] : [])
       ],
       mode: 'subscription',
-      success_url: `${app_url}/api/initial-payment?session_id={CHECKOUT_SESSION_ID}&recordId=${recordId}&paymentMethod=${paymentMethod}&customer=${finalCustomerId}`,
+      success_url: `https://somevoices.co.uk/success?&recordId=${recordId}&status=active`,
       cancel_url: 'https://somevoices.co.uk/cancelled',
       metadata,
       subscription_data: {
