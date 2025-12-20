@@ -82,45 +82,11 @@
   <label>Discount Code:<br><input type="text" id="discount-code-input" placeholder="e.g. WELCOME10" name="discount-code" /></label><br>
   <div id="discount-error" style="color:red; display:none;"></div>
 
-  <!-- Payment Method Selection for EU customers -->
-  <div id="payment-method-selection" style="display: none; margin: 20px 0; padding: 20px; border: 2px solid #e1e5e9; border-radius: 12px; background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%); box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-    <h3 style="margin: 0 0 16px 0; color: #2c3e50; font-size: 1.1em; font-weight: 600; display: flex; align-items: center;">
-      <!-- <span style="margin-right: 8px;">:credit_card:</span> -->
-      Choose Your Payment Method
-    </h3>
-    
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
-      <label style="display: flex; align-items: center; padding: 12px 16px; border: 2px solid #e9ecef; border-radius: 8px; background: white; cursor: pointer; transition: all 0.2s ease; position: relative;" 
-             onmouseover="this.style.borderColor='#007bff'; this.style.backgroundColor='#f8f9ff';" 
-             onmouseout="this.style.borderColor='#e9ecef'; this.style.backgroundColor='white';">
-        <input type="radio" name="payment-method" value="card" checked 
-               style="margin-right: 12px; transform: scale(1.2);" 
-               onchange="this.parentElement.style.borderColor='#007bff'; this.parentElement.style.backgroundColor='#f8f9ff';">
-        <div style="width: -webkit-fill-available;">
-          <div style="font-weight: 600; color: #2c3e50; margin-bottom: 2px;"> Credit/Debit Card</div>
-          <div style="font-size: 0.85em; color: #6c757d;">Visa, Mastercard, Amex</div>
-        </div>
-      </label>
-      
-      <label style="display: flex; align-items: center; padding: 12px 16px; border: 2px solid #e9ecef; border-radius: 8px; background: white; cursor: pointer; transition: all 0.2s ease;" 
-             onmouseover="this.style.borderColor='#28a745'; this.style.backgroundColor='#f8fff9';" 
-             onmouseout="this.style.borderColor='#e9ecef'; this.style.backgroundColor='white';">
-        <input type="radio" name="payment-method" value="ideal" 
-               style="margin-right: 12px; transform: scale(1.2);" 
-               onchange="this.parentElement.style.borderColor='#28a745'; this.parentElement.style.backgroundColor='#f8fff9';">
-        <div style="width: -webkit-fill-available;">
-          <div style="font-weight: 600; color: #2c3e50; margin-bottom: 2px;"> iDEAL</div>
-          <div style="font-size: 0.85em; color: #6c757d;">Direct bank payment</div>
-        </div>
-      </label>
-    </div>
-    
-    <!-- <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 6px; padding: 12px; margin-top: 16px;">
-      <p style="margin: 0; font-size: 0.9em; color: #856404; display: flex; align-items: flex-start;">
-        <span style="margin-right: 8px; margin-top: 2px;">:information_source:</span>
-        <span><strong>iDEAL Payment:</strong> Your subscription will be created first, then you'll be redirected to complete the initial payment through your bank.</span>
-      </p>
-    </div> -->
+  <!-- Note about payment options for EU customers -->
+  <div id="payment-info" style="display: none; margin: 20px 0; padding: 16px; border: 1px solid #ffeaa7; border-radius: 6px; background: #fff3cd;">
+    <p style="margin: 0; font-size: 0.9em; color: #856404;">
+      <strong>Note:</strong> For EU payments, both card and iDEAL options will be available on the checkout page.
+    </p>
   </div>
 
   <div id="termsBox" style="display:none; border:1px solid #ccc; border-radius:8px; padding:16px; max-height:250px; overflow-y:auto; background-color:#f9f9f9; box-shadow:0 2px 6px rgba(0,0,0,0.1); font-family:Arial, sans-serif; line-height:1.5; position:relative; margin-top:20px;">
@@ -236,15 +202,13 @@ const API = {
 
 let choirMap = {};
 
-// Helper function to show/hide payment method selection
-function togglePaymentMethodSelection(currency) {
-  const paymentMethodSelection = document.getElementById('payment-method-selection');
+// Helper function to show/hide payment info for EU customers
+function togglePaymentInfo(currency) {
+  const paymentInfo = document.getElementById('payment-info');
   if (currency === 'eur') {
-    paymentMethodSelection.style.display = 'block';
+    paymentInfo.style.display = 'block';
   } else {
-    paymentMethodSelection.style.display = 'none';
-    // Reset to card for non-EUR currencies
-    document.querySelector('input[name="payment-method"][value="card"]').checked = true;
+    paymentInfo.style.display = 'none';
   }
 }
 
@@ -273,8 +237,8 @@ async function loadChoirs(selectedName = '') {
       document.getElementById('unitAmount').value = record.unitAmount || '';
       document.getElementById('chartCode').value = record.chartCode || '';
       
-      // Show payment method selection if EUR
-      togglePaymentMethodSelection(currencyValue);
+      // Show payment info if EUR
+      togglePaymentInfo(currencyValue);
     }
 
     select.appendChild(option);
@@ -361,8 +325,8 @@ document.getElementById('choir-select').addEventListener('change', function () {
   document.getElementById('unitAmount').value = choir.unitAmount || '';
   document.getElementById('chartCode').value = choir.chartCode || '';
   
-  // Show payment method selection for EUR currency
-  togglePaymentMethodSelection(currency);
+  // Show payment info for EUR currency
+  togglePaymentInfo(currency);
 });
 
 document.getElementById('membership-form').addEventListener('submit', async (e) => {
@@ -377,7 +341,6 @@ document.getElementById('membership-form').addEventListener('submit', async (e) 
   const discountCode = formValues['discount-code'] || '';
   const choirId = formValues['choir'] || '';
   const currency = formValues['currency'] || '';
-  const paymentMethod = formValues['payment-method'] || 'card';
 
   if (discountCode) {
     const isValid = await checkDiscountCodeValid(discountCode);
@@ -398,8 +361,7 @@ document.getElementById('membership-form').addEventListener('submit', async (e) 
     billingAnchor: formValues['billing-date'] || '',
     currency,
     discountCode,
-    stripeCustomerId: formValues['stripe_customer-id'] || '',
-    paymentMethod
+    stripeCustomerId: formValues['stripe_customer-id'] || ''
   };
 
   try {
@@ -411,44 +373,26 @@ document.getElementById('membership-form').addEventListener('submit', async (e) 
     const result = await res.json();
     if (!res.ok || !result.recordId) throw new Error('Signup record creation failed');
 
-    // Different flow based on payment method selection
-    if (paymentMethod === 'ideal' && currency === 'eur') {
-      // iDEAL flow: Create subscription first, then initial payment
-      showLoadingOverlay('Creating your subscription and setting up iDEAL payment...');
-      
-      const subscriptionRes = await fetch(API.createSubscriptionFirst, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          recordId: result.recordId, 
-          priceId: 'price_1SEVL9PCfeZm56SKNyRD35x0', 
-          discountCode, 
-          billing_date: formValues['billing-date'],
-          paymentMethod: 'ideal'
-        })
-      });
-      const subscriptionData = await subscriptionRes.json();
-      if (!subscriptionRes.ok || !subscriptionData.checkoutUrl) throw new Error('Failed to create subscription and checkout');
+    // Use subscription-first flow for all payment methods
+    showLoadingOverlay('Creating your subscription...');
+    
+    const subscriptionRes = await fetch(API.createSubscriptionFirst, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        recordId: result.recordId, 
+        // priceId: 'price_1SEVL9PCfeZm56SKNyRD35x0',
+        // priceId: 'price_1RazwdPCfeZm56SKe9naUt3C',
+        priceId: formValues['priceId'],
+        discountCode, 
+        billing_date: formValues['billing-date'],
+        // No need to specify payment method as Stripe Checkout will show appropriate options
+      })
+    });
+    const subscriptionData = await subscriptionRes.json();
+    if (!subscriptionRes.ok || !subscriptionData.checkoutUrl) throw new Error('Failed to create subscription and checkout');
 
-      window.location.href = subscriptionData.checkoutUrl;
-    } else {
-      // Standard flow: Initial payment first, then subscription
-      const checkoutRes = await fetch(API.createInitialCheckout, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          recordId: result.recordId, 
-          priceId: formValues['priceId'], 
-          discountCode, 
-          billing_date: formValues['billing-date'],
-          paymentMethod: 'card'
-        })
-      });
-      const checkoutData = await checkoutRes.json();
-      if (!checkoutRes.ok || !checkoutData.url) throw new Error('Failed to start Stripe Checkout');
-
-      window.location.href = checkoutData.url;
-    }
+    window.location.href = subscriptionData.checkoutUrl;
   } catch (err) {
     alert(`Submission failed: ${err.message}`);
   } finally {
