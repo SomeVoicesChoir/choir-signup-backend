@@ -21,6 +21,13 @@ function getBillingAnchorTimestamp(billing_date, skipNextMonth) {
   } else {
       billingDate = new Date(currentYear, currentMonth, dayOfMonth);
   }
+  // Stripe requires trial_end to be at least 48 hours in the future.
+  // If the anchor is too close, push to next month.
+  const minTrialEnd = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+  if (billingDate < minTrialEnd) {
+    billingDate = new Date(billingDate.getFullYear(), billingDate.getMonth() + 1, dayOfMonth);
+  }
+
   return Math.floor(billingDate.getTime() / 1000);
 }
 
