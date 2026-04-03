@@ -226,3 +226,98 @@ Static HTML form embedded in Squarespace. Key features:
 
 ### Airtable Change (Manual)
 - `Will Push to Next Month` formula: `IF({Days Until Billing} < 3, "Yes", "No")`
+
+---
+
+## Session Log: April 3, 2026
+
+### What We Fixed
+
+**500 Errors on Certain Choirs — Airtable `#ERROR!` Cascading to Stripe:**
+- Some choirs caused `create-subscription-first` to return 500: `Invalid string: {:error=>"#ERROR!"}`
+- Root cause: Airtable formula fields returned `#ERROR!` when `{Next Rehearsal Date (from Choir)}` was "Not yet booked" or blank, and that error string was passed directly to Stripe
+- Fixed multiple formula fields to handle blank/invalid dates gracefully:
+
+**1. `{Next Rehearsal Date}` formula:**
+- Was: `DATETIME_FORMAT(DATETIME_PARSE(...), "YYYY-MM-DD")` — errored on "Not yet booked"
+- Fix: Wrapped in `IF()` that checks for empty and "Not yet booked", returns `""` instead
+
+**2. `{Skip Next Month}` formula:**
+- Was: Used `DATETIME_FORMAT({Next Rehearsal Date}, ...)` directly — errored when date was blank
+- Fix: Airtable evaluates both branches of `OR()` even if first is true, so moved the blank check into a separate outer `IF()` — date functions only run when field has a value
+
+**3. `{Billing Anchor Rehearsals Left Multiplier}` — New Term Pro-Rata Fix:**
+- **Problem:** Members signing up at the start of a new term (Jan/May/Sep) were double-charged — pro-rata for rehearsals before the anchor PLUS the full monthly payment on the anchor date
+- Example: Sign up Jan 2nd, anchor = 15th → paid £7.25 pro-rata + £29 on Jan 15th = £36.25 (should be max £29)
+- **Additional complexity:** Summer term rehearsals sometimes start in late April, but first full payment should be May
+- **Fix:** Added `{week 1 date}` lookup check — if today is before the first billing anchor on/after the term's first rehearsal, multiplier = 0 (just £1 activation fee, first full payment on anchor)
+- Logic: parse `{week 1 date}`, find the 1st/15th of that month (or next month if week 1 falls after the anchor day), compare against TODAY()
+
+### Key Decisions
+
+| Decision | Reason |
+|----------|--------|
+| Nested `IF()` instead of `OR()` for blank checks | Airtable evaluates all branches of `OR()` — `DATETIME_FORMAT` on blank still errors even if first condition is true |
+| `{week 1 date}` for term boundary detection | Available as lookup on Signup Queue; more reliable than hardcoding months since summer term can start in April |
+| Multiplier = 0 for new term signups (not "skip" flag) | The 4 monthly payments from the anchor already cover the full term; pro-rata is only for mid-term joins |
+| Empty `{week 1 date}` → multiplier 0 | No term data = no rehearsals to charge for; just take £1 activation |
+
+### Issues Encountered / Workarounds
+
+**Airtable `OR()` eagerly evaluates all branches:**
+- First attempt at `{Skip Next Month}` fix used `OR({Next Rehearsal Date} = "", NOT(DATETIME_FORMAT(...)))` — still errored because Airtable evaluates the `DATETIME_FORMAT` branch even when the first condition is true
+- Fix: Nested `IF()` so date functions are only reached when the field has a value
+
+**`#ERROR!` cascade:**
+- One broken formula field (`{Next Rehearsal Date}`) cascaded errors into `{Skip Next Month}`, `{Days Until Billing}`, `{Billing Anchor Rehearsals Left Multiplier}`, and `{Total Cost Initial Invoice}` — all of which feed into the Stripe checkout call
+- All downstream formulas now handle blank inputs gracefully
+
+### Airtable Formula Changes (Manual)
+
+**`{Next Rehearsal Date}`:**
+```
+IF(
+  AND(
+    {Next Rehearsal Date (from Choir)} != "",
+    {Next Rehearsal Date (from Choir)} != "Not yet booked"
+  ),
+  DATETIME_FORMAT(
+    DATETIME_PARSE(ARRAYJOIN({Next Rehearsal Date (from Choir)}, "")),
+    "YYYY-MM-DD"
+  ),
+  ""
+)
+```
+
+**`{Skip Next Month}`:**
+```
+IF(
+  OR(
+    {Next Rehearsal Date} = "",
+    {Next Rehearsal Date} = BLANK()
+  ),
+  "Yes",
+  IF(
+    NOT(
+      OR(
+        DATETIME_FORMAT({Next Rehearsal Date}, 'YYYY-MM') = DATETIME_FORMAT(TODAY(), 'YYYY-MM'),
+        DATETIME_FORMAT({Next Rehearsal Date}, 'YYYY-MM') = DATETIME_FORMAT(DATEADD(TODAY(), 1, 'month'), 'YYYY-MM')
+      )
+    ),
+    "Yes",
+    "No"
+  )
+)
+```
+
+**`{Billing Anchor Rehearsals Left Multiplier}`:**
+- Added `{week 1 date}` blank check at top (returns 0)
+- Added new-term check: if today < first billing anchor on/after `{week 1 date}`, returns 0
+- Otherwise falls through to existing rehearsal-count SWITCH logic
+
+### What's Next / Where We Left Off
+
+- All `#ERROR!` formula cascades fixed — choirs with "Not yet booked" or blank rehearsal dates can now sign up
+- New term pro-rata fix deployed — members joining at term start pay £1 activation only, first full payment on anchor
+- One choir currently showing "push to next month" — likely correct behaviour due to blank `{Next Rehearsal Date}`, needs verification
+- May need to verify `{Rehearsals to 1st}` and `{Rehearsals to 15th}` also handle blank dates gracefully
