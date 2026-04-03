@@ -52,10 +52,46 @@ An older two-step flow exists but is **not called by the current frontend**:
 ## Critical: Billing Anchor & Trial Period Logic
 
 ### How It Works
-- Members choose billing on the **1st** or **15th** of each month
-- A pro-rata initial payment covers the period from signup to the first billing date
-- Stripe's `trial_end` parameter defers the first subscription invoice to the billing anchor date
-- The pro-rata amount is calculated by Airtable using `Billing Anchor Rehearsals Left Multiplier`
+
+Two independent questions are answered at checkout:
+
+**Question 1: How much does the customer pay today?** (initial payment — calculated by Airtable)
+
+```
+{week 1 date}                          ← When does this term start?
+        ↓
+{Billing Anchor Rehearsals Left         ← Is this a new-term signup?
+ Multiplier}                              If yes → 0 (no pro-rata)
+        ↓                                If no → how many rehearsals
+{Rehearsals to 1st} or                    remain before the anchor?
+{Rehearsals to 15th}                      0=0, 1=0.25, 2=0.5, 3=0.75, 4+=1
+        ↓
+{Total Cost Initial Invoice}           ← Monthly price × multiplier
+                                          + 100 pence (£1 activation)
+                                          (minus discount if applicable)
+```
+
+**Question 2: When does the first subscription invoice land?** (trial_end — calculated by Airtable + code)
+
+```
+{Next Rehearsal Date (from Choir)}      ← Raw lookup: date or "Not yet booked"
+        ↓
+{Next Rehearsal Date}                   ← Parsed to YYYY-MM-DD (or "" if invalid)
+        ↓
+{Next Billing Date (Before Push)}       ← Next 1st or 15th based on billing anchor
+        ↓
+{Days Until Billing}                    ← DATETIME_DIFF to TODAY() in days
+        ↓
+{Will Push to Next Month}              ← < 3 days? → "Yes" (too close for Stripe)
+        ↓
+{Skip Next Month}                      ← Also "Yes" if date is blank/out of range
+        ↓
+getBillingAnchorTimestamp() [CODE]      ← Calculates the trial_end timestamp
+                                          If Skip Next Month = Yes → +1 month
+                                          If still < 48hrs → +1 more month
+```
+
+**The golden rule:** Both paths must agree. If the code pushes the first invoice further out, Airtable must charge enough in the initial payment to cover that period. The `< 3` day threshold in Airtable and the 48-hour check in code are aligned to ensure this.
 
 ### The 48-Hour Edge Case (Fixed April 2026)
 **Stripe requires `trial_end` to be at least 48 hours in the future.**
