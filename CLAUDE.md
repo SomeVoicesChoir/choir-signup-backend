@@ -61,8 +61,11 @@ Two independent questions are answered at checkout:
 {week 1 date}                          ← When does this term start?
         ↓
 {Billing Anchor Rehearsals Left         ← Is this a new-term signup?
- Multiplier}                              If yes → 0 (no pro-rata)
-        ↓                                If no → how many rehearsals
+ Multiplier}                              If yes AND anchor won't be bumped → 0
+                                          If yes AND anchor WILL be bumped → 1
+                                            (include first month's payment now,
+                                             since subscription starts month after)
+        ↓                                If no (mid-term) → how many rehearsals
 {Rehearsals to 1st} or                    remain before the anchor?
 {Rehearsals to 15th}                      0=0, 1=0.25, 2=0.5, 3=0.75, 4+=1
         ↓
@@ -70,6 +73,8 @@ Two independent questions are answered at checkout:
                                           + 100 pence (£1 activation)
                                           (minus discount if applicable)
 ```
+
+**New-term + bump interaction:** When someone signs up at the start of term but too close to their anchor (< 3 days), the code bumps trial_end to next month. Without charging the first month upfront, the customer would get a free month. The multiplier formula checks `{Will Push to Next Month}` — if "Yes", returns 1 instead of 0, so the initial payment includes a full month's charge.
 
 **Question 2: When does the first subscription invoice land?** (trial_end — calculated by Airtable + code)
 
@@ -357,3 +362,47 @@ IF(
 - New term pro-rata fix deployed — members joining at term start pay £1 activation only, first full payment on anchor
 - One choir currently showing "push to next month" — likely correct behaviour due to blank `{Next Rehearsal Date}`, needs verification
 - May need to verify `{Rehearsals to 1st}` and `{Rehearsals to 15th}` also handle blank dates gracefully
+
+---
+
+## Session Log: April 7, 2026
+
+### What We Fixed
+
+**New-Term Signup + 48-Hour Bump = Free Month:**
+- A customer signed up April 30th with anchor = 1st
+- New-term multiplier returned 0 (just £1 activation) — correct for new term
+- Code bumped trial_end from May 1st to June 1st (< 48 hours) — correct for Stripe
+- **Result:** Customer paid £1, first subscription invoice June 1st — May was free
+
+**Root cause:** The new-term multiplier (0) and the 48-hour bump (push to next month) are independent systems that weren't talking to each other. When both fire, the multiplier needs to be 1, not 0, so the initial payment includes the first month's charge.
+
+### Fix Applied
+
+**`{Billing Anchor Rehearsals Left Multiplier}` — Airtable formula update:**
+- Changed the new-term return value from `0` to `IF({Will Push to Next Month} = "Yes", 1, 0)`
+- Both anchor branches (1st and 15th) updated
+
+**Logic:**
+- New term + anchor far enough away → multiplier = 0 (£1 activation, first payment on anchor) ✓
+- New term + anchor too close (will be bumped) → multiplier = 1 (£29 + £1 today, subscription starts month after) ✓
+- Mid-term → existing rehearsal-count logic unchanged ✓
+
+**Verification (April 30th, anchor = 1st):**
+- Multiplier = 1 → initial charge = £29 + £1 = £30
+- Code bumps trial_end to June 1st
+- Subscription: Jun 1 (£29), Jul 1 (£29), Aug 1 (£29)
+- Total: £30 + £87 = £117 = £116 term + £1 activation ✓
+
+### Key Decisions
+
+| Decision | Reason |
+|----------|--------|
+| Fix in Airtable formula (not code) | The multiplier controls the charge amount; code only controls timing. When timing shifts, the charge must compensate |
+| `IF({Will Push to Next Month} = "Yes", 1, 0)` not just `1` | Most new-term signups (> 3 days before anchor) should still pay £1 only — the bump case is the exception |
+
+### What's Next / Where We Left Off
+
+- All edge cases now covered: new-term, mid-term, close-to-anchor, and new-term-close-to-anchor
+- No code changes this session — fix was entirely in Airtable formula
+- The "golden rule" still holds: if the code pushes the invoice further, Airtable charges more upfront to compensate
