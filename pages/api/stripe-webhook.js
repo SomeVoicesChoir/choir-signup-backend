@@ -255,6 +255,33 @@ export default async function handler(req, res) {
         });
       }
 
+      // If this is the FIRST subscription invoice (will show Stripe's "Trial period" wording),
+      // add a footer + custom field explaining the trial is actually a billing delay.
+      // Only the first invoice (billing_reason = subscription_create) carries the trial labelling;
+      // subsequent monthly invoices don't, so we don't need to add the footer to them.
+      if (invoice.billing_reason === 'subscription_create' && invoice.subscription) {
+        try {
+          const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
+          if (subscription.trial_end) {
+            const trialEndDate = new Date(subscription.trial_end * 1000);
+            const trialEndReadable = trialEndDate.toLocaleDateString('en-GB', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            });
+            await stripe.invoices.update(invoice.id, {
+              footer: `The "Trial period" shown above is not a free trial — it is a billing delay so your monthly Some Voices membership payments align with your chosen billing date. Your first £29 monthly payment will be charged on ${trialEndReadable}.`,
+              custom_fields: [
+                { name: 'Subscription begins', value: trialEndReadable }
+              ]
+            });
+            console.log(`✅ Added billing-anchor footer to invoice ${invoice.id}`);
+          }
+        } catch (invoiceUpdateErr) {
+          console.error('⚠️ Could not update invoice footer (non-fatal):', invoiceUpdateErr.message);
+        }
+      }
+
     } catch (err) {
       console.error('❌ Error logging invoice:', err);
     }

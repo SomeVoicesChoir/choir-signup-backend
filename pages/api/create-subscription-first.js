@@ -132,6 +132,16 @@ export default async function handler(req, res) {
     });
     console.log('Updated product description in Stripe for product ID:', productId);
 
+    // Compute trial_end once and format a human-readable date string for customer-facing messaging.
+    // The "trial" here is Stripe's mechanism for delaying the first subscription invoice to the
+    // customer's billing anchor — not a complimentary period.
+    const trialEnd = getBillingAnchorTimestamp(billing_date, skipNextMonth);
+    const trialEndDate = new Date(trialEnd * 1000);
+    const trialEndReadable = trialEndDate.toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
 
     // Create a subscription session
     const sessionConfig = {
@@ -151,7 +161,7 @@ export default async function handler(req, res) {
             unit_amount: amount,
             product_data: {
               name: `${record.fields['Choir Name'] || ''} - Initial Payment`,
-              description: `${description} (One-time payment)`,
+              description: `${description} - monthly subscription begins ${trialEndReadable}`,
             },
           },
           quantity: 1,
@@ -162,8 +172,14 @@ export default async function handler(req, res) {
       cancel_url: 'https://somevoices.co.uk/cancelled',
       metadata,
       subscription_data: {
-        trial_end: getBillingAnchorTimestamp(billing_date, skipNextMonth),
+        trial_end: trialEnd,
+        description: `Some Voices Membership — first monthly payment ${trialEndReadable}`,
         metadata,
+      },
+      custom_text: {
+        submit: {
+          message: `Your monthly Some Voices subscription begins on ${trialEndReadable}. The "free trial" wording shown above is Stripe's term for a billing delay — it aligns your monthly payments with your chosen billing date (1st or 15th). This is not a complimentary trial. Your initial payment today covers any pro-rata fees plus a one-time £1 activation fee.`
+        }
       },
       automatic_tax: { enabled: true },
       consent_collection: {
