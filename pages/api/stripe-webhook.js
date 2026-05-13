@@ -282,6 +282,29 @@ export default async function handler(req, res) {
         }
       }
 
+      // Snapshot multiplier + tier + initial charge on the Signup Queue record.
+      // Frozen values (non-formula) so historical audits don't drift with TODAY().
+      // Only fires on the first subscription invoice (the one paid at checkout).
+      if (invoice.billing_reason === 'subscription_create') {
+        try {
+          const recordId = invoice.metadata?.recordId
+            || invoice.subscription_details?.metadata?.recordId;
+          if (recordId) {
+            const signupRecord = await base('Signup Queue').find(recordId);
+            await base('Signup Queue').update(recordId, {
+              'Initial Charge Paid': invoice.amount_paid,
+              'Multiplier at Signup': signupRecord.fields['Billing Anchor Rehearsals Left Multiplier'],
+              'Tier at Signup': signupRecord.fields['Tier (Current)'],
+            });
+            console.log(`✅ Wrote signup snapshot to Signup Queue ${recordId}`);
+          } else {
+            console.warn('⚠️ No recordId in invoice metadata — snapshot skipped for invoice', invoice.id);
+          }
+        } catch (snapshotErr) {
+          console.error('⚠️ Could not write signup snapshot (non-fatal):', snapshotErr.message);
+        }
+      }
+
     } catch (err) {
       console.error('❌ Error logging invoice:', err);
     }
