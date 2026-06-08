@@ -79,15 +79,17 @@ export default async function handler(req, res) {
         });
         for (const sub of subs.data) {
           if (!ACTIVE_STATUSES.includes(sub.status)) continue;
-          const periodEnd = sub.current_period_end
-            ? new Date(sub.current_period_end * 1000)
-            : null;
+          // Stripe moved subscription period fields from the top-level to items
+          // in late-2024 API versions. Try items first, fall back to top-level.
+          const periodEndUnix =
+            sub.items?.data?.[0]?.current_period_end || sub.current_period_end || null;
+          const periodEnd = periodEndUnix ? new Date(periodEndUnix * 1000) : null;
           activeSubscriptions.push({
             id: sub.id,
             status: sub.status,
             customerId: customer.id,
             choirName: sub.metadata?.choirName || sub.metadata?.choir || null,
-            currentPeriodEnd: sub.current_period_end || null,
+            currentPeriodEnd: periodEndUnix,
             currentPeriodEndReadable: periodEnd
               ? periodEnd.toLocaleDateString('en-GB', {
                   day: 'numeric',
