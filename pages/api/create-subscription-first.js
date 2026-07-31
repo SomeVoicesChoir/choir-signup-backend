@@ -178,7 +178,7 @@ export default async function handler(req, res) {
       },
       custom_text: {
         submit: {
-          message: `Your monthly Some Voices subscription begins on ${trialEndReadable}. The "free trial" wording shown above is Stripe's term for a billing delay — it aligns your monthly payments with your chosen billing date (1st or 15th). This is not a complimentary trial. Your initial payment today covers any pro-rata fees plus a one-time £1 activation fee.`
+          message: `Your monthly Some Voices subscription begins on ${trialEndReadable}. The "free trial" wording shown above is Stripe's term for a billing delay — it aligns your monthly payments with your chosen billing date (1st or 15th). This is not a complimentary trial. Your initial payment today covers any pro-rata fees plus a one-time £1.50 activation fee.`
         }
       },
       automatic_tax: { enabled: true },

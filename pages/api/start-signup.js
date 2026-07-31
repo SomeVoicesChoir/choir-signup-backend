@@ -30,7 +30,7 @@ export default async function handler(req, res) {
       payment_method_types: ['card'],
       customer: stripeCustomerId || undefined,
       customer_email: stripeCustomerId ? undefined : email,
-      line_items: [{ price_data: { currency: 'gbp', unit_amount: 100, product_data: { name: 'Some Voices Initial Payment' } }, quantity: 1 }],
+      line_items: [{ price_data: { currency: 'gbp', unit_amount: 150, product_data: { name: 'Some Voices Initial Payment' } }, quantity: 1 }],
       success_url: `https://somevoices.co.uk/success-initial?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: 'https://somevoices.co.uk/cancelled'
     });
