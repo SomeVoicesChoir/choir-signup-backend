@@ -137,18 +137,37 @@ export default async function handler(req, res) {
       payment_method_types = ['card', 'ideal'];
     }
     
+    // Airtable's own summary string. No longer shown to the customer — the checkout
+    // copy below is built from `amount`, the same number Stripe charges, so the two
+    // cannot drift apart. Kept for the log, as a readable record of what Airtable
+    // computed for this row.
     const description = record.fields['Initial Payment Description'] || 'Some Voices – Initial Pro-Rata Payment';
-    console.log('Using description:', description);
+    console.log('Airtable summary for this signup:', description);
 
     // Retrieve the price to get the product ID
     const price = await stripe.prices.retrieve(priceId, { expand: ['product'] });
     const productId = typeof price.product === 'string' ? price.product : price.product.id;
-    
-    // Update the product description in Stripe
+
+    // --- Checkout copy -------------------------------------------------------
+    // Split the one figure people actually care about into its two parts, so the
+    // line items can say what each is for instead of repeating one long string.
+    const choirName = record.fields['Choir Name'] || 'Some Voices';
+    const sym = currency === 'eur' ? '€' : '£';
+    const fmt = (pence) => sym + (Number(pence || 0) / 100).toFixed(2);
+    const activationFee = Number(record.fields['Activation Fee'] || 0);
+    const rehearsalPortion = Math.max(0, amount - activationFee);
+    const monthlyAmount = Number(record.fields['Monthly Subscription Cost (inc Discount)']) || price.unit_amount;
+    const joinMonth = new Date(record.fields['Created'] || Date.now())
+      .toLocaleDateString('en-GB', { month: 'long' });
+
+    // The product is shared by EVERY member of this choir, so it must never carry
+    // one person's figures — two people checking out at once would each see the
+    // other's amount, and whoever finished last would leave their number frozen
+    // there for the next person. Personal detail belongs on the one-off line item
+    // and in custom_text, both of which are per-session.
     await stripe.products.update(productId, {
-      description: description
+      description: `Your monthly ${choirName} membership, billed on the same date each month.`,
     });
-    console.log('Updated product description in Stripe for product ID:', productId);
 
     // Compute trial_end once and format a human-readable date string for customer-facing messaging.
     // The "trial" here is Stripe's mechanism for delaying the first subscription invoice to the
@@ -178,8 +197,12 @@ export default async function handler(req, res) {
             currency,
             unit_amount: amount,
             product_data: {
+              // Name deliberately unchanged: it lands on the Stripe invoice line that
+              // Zapier forwards to Xero, so it may be matched on downstream.
               name: `${record.fields['Choir Name'] || ''} - Initial Payment`,
-              description: `${description} - monthly subscription begins ${trialEndReadable}`,
+              description: rehearsalPortion > 0
+                ? `Rehearsals for the rest of ${joinMonth} ${fmt(rehearsalPortion)}, plus a one-off ${fmt(activationFee)} activation fee.`
+                : `One-off ${fmt(activationFee)} activation fee. Your first monthly payment is ${fmt(monthlyAmount)} on ${trialEndReadable}.`,
             },
           },
           quantity: 1,
@@ -191,12 +214,17 @@ export default async function handler(req, res) {
       metadata,
       subscription_data: {
         trial_end: trialEnd,
-        description: `Some Voices Membership — first monthly payment ${trialEndReadable}`,
+        description: `${choirName} monthly membership — first payment ${trialEndReadable}`,
         metadata,
       },
       custom_text: {
         submit: {
-          message: `Your monthly Some Voices subscription begins on ${trialEndReadable}. The "free trial" wording shown above is Stripe's term for a billing delay — it aligns your monthly payments with your chosen billing date (1st or 15th). This is not a complimentary trial. Your initial payment today covers any pro-rata fees plus a one-time £1.50 activation fee.`
+          // Lead with what they pay, then head off the "free" badge above. Stripe
+          // renders any trial_end as "N days free" and gives us no way to relabel
+          // it, so the wait until the first monthly payment has to be named here.
+          message: `You'll pay ${fmt(amount)} today${rehearsalPortion > 0
+            ? ` — ${fmt(rehearsalPortion)} for the rest of ${joinMonth}, plus a one-off ${fmt(activationFee)} activation fee`
+            : ` — a one-off ${fmt(activationFee)} activation fee`}. Your ${fmt(monthlyAmount)} monthly payments then start on ${trialEndReadable}. Stripe shows that gap as "free" above — it isn't a free trial, just the wait until your first monthly payment date.`
         }
       },
       automatic_tax: { enabled: true },
