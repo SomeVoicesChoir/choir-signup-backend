@@ -106,6 +106,24 @@ export default async function handler(req, res) {
       throw new Error('Unable to create or validate customer');
     }
 
+    // Snapshot the pricing inputs as they stand RIGHT NOW, at the moment of sale.
+    // {Billing Anchor Rehearsals Left Multiplier} and {Tier (Current)} are formulas
+    // keyed on TODAY(), so they drift every day — by tomorrow the record no longer
+    // shows what this customer was priced on. Nothing else can recover these after
+    // the fact (the charge amount can be reconciled from Stripe later; the multiplier
+    // and tier cannot). Non-fatal: never block a paying signup on bookkeeping.
+    // typecast:true so a newly-added tier name creates its select option rather than 422ing.
+    try {
+      await base('Signup Queue').update(recordId, {
+        'Multiplier at Signup': record.fields['Billing Anchor Rehearsals Left Multiplier'] ?? null,
+        'Tier at Signup': record.fields['Tier (Current)'] || null,
+      }, { typecast: true });
+      console.log('Wrote signup snapshot:', record.fields['Tier (Current)'],
+                  'x' + record.fields['Billing Anchor Rehearsals Left Multiplier']);
+    } catch (snapshotErr) {
+      console.error('Could not write signup snapshot (non-fatal):', snapshotErr.message);
+    }
+
     // We'll create the subscription through the Stripe hosted page
     // No need to create it separately here
 
