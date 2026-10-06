@@ -33,3 +33,7 @@ yarn-error.log*
 # IDE
 .vscode/
 .idea/
+
+# member data exports — never commit (this repo pushes to GitHub)
+*.csv
+*.private/

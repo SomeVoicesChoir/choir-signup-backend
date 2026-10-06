@@ -1,0 +1,98 @@
+{
+  "SV Membership Base › Signup Queue › Billing Anchor Rehearsals Left Multiplier": {
+    "base": "appgeAZX8ydvde5th",
+    "table": "tblNHlZ2u3C65XuW7",
+    "id": "fld4oIQQKwnMAKRPA",
+    "type": "formula",
+    "formula": "IF( OR( {fldISHm4zAgiYgIYy} = \"\", {fldISHm4zAgiYgIYy} = BLANK() ), 0, IF( {fldZX6apL8enQhKAw} = \"Yes\", 1, IF( TODAY() < DATEADD( DATETIME_PARSE( DATETIME_FORMAT( DATETIME_PARSE(ARRAYJOIN({fldISHm4zAgiYgIYy}, \"\"), 'M/D/YYYY HH:mm'), IF({fldBP82yfJVR0zlEn} = \"1\", 'YYYY-MM-01', 'YYYY-MM-15') ), 'YYYY-MM-DD' ), IF(MONTH(DATETIME_PARSE(ARRAYJOIN({fldISHm4zAgiYgIYy}, \"\"), 'M/D/YYYY HH:mm')) = 4, 1, 0), 'months' ), 0, IF( TODAY() < DATETIME_PARSE(ARRAYJOIN({fldISHm4zAgiYgIYy}, \"\"), 'M/D/YYYY HH:mm'), 1, IF( {fldBP82yfJVR0zlEn} = \"1\", IF( VALUE(ARRAYJOIN({fldBeRzEhn8f864Rq}, \"\")) >= 4, 1, SWITCH( VALUE(ARRAYJOIN({fldBeRzEhn8f864Rq}, \"\")), 3, 0.75, 2, 0.5, 1, 0.25, 0, 0, 1 ) ), IF( VALUE(ARRAYJOIN({fldyYfFrvBZTXP9V1}, \"\")) >= 4, 1, SWITCH( VALUE(ARRAYJOIN({fldyYfFrvBZTXP9V1}, \"\")), 3, 0.75, 2, 0.5, 1, 0.25, 0, 0, 1 ) ) ) ) ) ) )",
+    "sha": "c0d34b66913182be"
+  },
+  "SV Membership Base › Signup Queue › Total Cost Initial Invoice": {
+    "base": "appgeAZX8ydvde5th",
+    "table": "tblNHlZ2u3C65XuW7",
+    "id": "fldjSjmsjRjcQa5oO",
+    "type": "formula",
+    "formula": "ROUND( {fldwPMOPbfUMDGvIp} * {fld4oIQQKwnMAKRPA}, 0 ) + {fldUxIhRH1xcwPmB9}",
+    "sha": "3457124f851636a8"
+  },
+  "SV Membership Base › Signup Queue › Total Cost Initial Invoice 48 HOUR TRIAL CONSIDERED": {
+    "base": "appgeAZX8ydvde5th",
+    "table": "tblNHlZ2u3C65XuW7",
+    "id": "fldLlu3e3jiWHkydA",
+    "type": "formula",
+    "formula": "IF( {fldZX6apL8enQhKAw} = \"Yes\", {fldwPMOPbfUMDGvIp} + {fldUxIhRH1xcwPmB9}, ROUND( IF( {flddsOy8l0LErBuT5}, {fldwPMOPbfUMDGvIp} * {fld4oIQQKwnMAKRPA} * (1 - {flddsOy8l0LErBuT5} / 100), {fldwPMOPbfUMDGvIp} * {fld4oIQQKwnMAKRPA} ), 0 ) + {fldUxIhRH1xcwPmB9} )",
+    "sha": "64d65b7fad3603e3"
+  },
+  "SV Membership Base › Signup Queue › Tier (Current)": {
+    "base": "appgeAZX8ydvde5th",
+    "table": "tblNHlZ2u3C65XuW7",
+    "id": "fldQ9rvIv8lJAveIe",
+    "type": "formula",
+    "formula": "IF( OR({fldISHm4zAgiYgIYy} = \"\", {fldISHm4zAgiYgIYy} = BLANK()), \"1. blank\", IF( {fldZX6apL8enQhKAw} = \"Yes\", \"2. Will Push\", IF( TODAY() < DATEADD(DATETIME_PARSE(DATETIME_FORMAT(DATETIME_PARSE(ARRAYJOIN({fldISHm4zAgiYgIYy}, \"\"), 'M/D/YYYY HH:mm'), IF({fldBP82yfJVR0zlEn} = \"1\", 'YYYY-MM-01', 'YYYY-MM-15')), 'YYYY-MM-DD'), IF(MONTH(DATETIME_PARSE(ARRAYJOIN({fldISHm4zAgiYgIYy}, \"\"), 'M/D/YYYY HH:mm')) = 4, 1, 0), 'months'), \"3. before first anchor\", IF( TODAY() < DATETIME_PARSE(ARRAYJOIN({fldISHm4zAgiYgIYy}, \"\"), 'M/D/YYYY HH:mm'), \"4. between anchor & week 1\", \"5. post-week-1 (pro-rata)\" ) ) ) )",
+    "sha": "dcdd6d19082ce30e"
+  },
+  "SV Membership Base › Signup Queue › Will Push to Next Month": {
+    "base": "appgeAZX8ydvde5th",
+    "table": "tblNHlZ2u3C65XuW7",
+    "id": "fldZX6apL8enQhKAw",
+    "type": "formula",
+    "formula": "IF({fldUjAVf8GWDZv2z6} < 3, \"Yes\", \"No\")",
+    "sha": "966dd61812bf4af6"
+  },
+  "SV Membership Base › Signup Queue › Skip Next Month": {
+    "base": "appgeAZX8ydvde5th",
+    "table": "tblNHlZ2u3C65XuW7",
+    "id": "fldPlrxmFQOlE7L13",
+    "type": "formula",
+    "formula": "IF( OR( {fld7PCEM0Wjs9E8jf} = \"\", {fld7PCEM0Wjs9E8jf} = BLANK() ), \"No\", IF( NOT( OR( DATETIME_FORMAT({fld7PCEM0Wjs9E8jf}, 'YYYY-MM') = DATETIME_FORMAT(TODAY(), 'YYYY-MM'), DATETIME_FORMAT({fld7PCEM0Wjs9E8jf}, 'YYYY-MM') = DATETIME_FORMAT(DATEADD(TODAY(), 1, 'month'), 'YYYY-MM') ) ), \"Yes\", \"No\" ) )",
+    "sha": "f89f2f6074b380b8"
+  },
+  "SV Membership Base › Signup Queue › Days Until Billing": {
+    "base": "appgeAZX8ydvde5th",
+    "table": "tblNHlZ2u3C65XuW7",
+    "id": "fldUjAVf8GWDZv2z6",
+    "type": "formula",
+    "formula": "DATETIME_DIFF({fldQvONHwLKDQRj6R}, TODAY(), 'days')",
+    "sha": "adfaa36a0ad73eff"
+  },
+  "SV Membership Base › Signup Queue › Next Billing Date (Before Push)": {
+    "base": "appgeAZX8ydvde5th",
+    "table": "tblNHlZ2u3C65XuW7",
+    "id": "fldQvONHwLKDQRj6R",
+    "type": "formula",
+    "formula": "DATETIME_PARSE( YEAR(TODAY()) & \"-\" & IF( {fldPlrxmFQOlE7L13} = \"Yes\", MONTH(TODAY()) + 2, IF( DAY(TODAY()) >= {fldBP82yfJVR0zlEn}, MONTH(TODAY()) + 1, MONTH(TODAY()) ) ) & \"-\" & {fldBP82yfJVR0zlEn}, 'YYYY-M-D' )",
+    "sha": "23d8fa28401ae1a8"
+  },
+  "SV Membership Base › Signup Queue › Next Rehearsal Date": {
+    "base": "appgeAZX8ydvde5th",
+    "table": "tblNHlZ2u3C65XuW7",
+    "id": "fld7PCEM0Wjs9E8jf",
+    "type": "formula",
+    "formula": "IF( AND( {fldFa27gNdDPSxsrB} != \"\", {fldFa27gNdDPSxsrB} != \"Not yet booked\" ), DATETIME_FORMAT( DATETIME_PARSE(ARRAYJOIN({fldFa27gNdDPSxsrB}, \"\")), \"YYYY-MM-DD\" ), \"\" )",
+    "sha": "7ed2d57d5f4f32bc"
+  },
+  "Choirs › Rehearsals › Rehearsals to 1st": {
+    "base": "app5eEsU46HOwnLd2",
+    "table": "tbl8DgEG18XD7KVlS",
+    "id": "fldLjXTjRsNM5zqFh",
+    "type": "formula",
+    "formula": "( IF(AND({fld0ZLJt9yTVNT4qd}, {fld0ZLJt9yTVNT4qd} >= NOW(), {fld0ZLJt9yTVNT4qd} < DATEADD(DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-01')), 1, 'month')), 1, 0) + IF(AND({fldRUnHWYUKqzOr8b}, {fldRUnHWYUKqzOr8b} >= NOW(), {fldRUnHWYUKqzOr8b} < DATEADD(DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-01')), 1, 'month')), 1, 0) + IF(AND({fldPzv78Vxy4eugxs}, {fldPzv78Vxy4eugxs} >= NOW(), {fldPzv78Vxy4eugxs} < DATEADD(DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-01')), 1, 'month')), 1, 0) + IF(AND({fld4Wjytxg24GXttr}, {fld4Wjytxg24GXttr} >= NOW(), {fld4Wjytxg24GXttr} < DATEADD(DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-01')), 1, 'month')), 1, 0) + IF(AND({fldOVk5iqHeR2XwZz}, {fldOVk5iqHeR2XwZz} >= NOW(), {fldOVk5iqHeR2XwZz} < DATEADD(DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-01')), 1, 'month')), 1, 0) + IF(AND({fldIsLsKecIpp7KfJ}, {fldIsLsKecIpp7KfJ} >= NOW(), {fldIsLsKecIpp7KfJ} < DATEADD(DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-01')), 1, 'month')), 1, 0) + IF(AND({fldg3GC51gtsUbUt5}, {fldg3GC51gtsUbUt5} >= NOW(), {fldg3GC51gtsUbUt5} < DATEADD(DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-01')), 1, 'month')), 1, 0) + IF(AND({fldWLkpaLBihr5fjo}, {fldWLkpaLBihr5fjo} >= NOW(), {fldWLkpaLBihr5fjo} < DATEADD(DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-01')), 1, 'month')), 1, 0) + IF(AND({fldlHh3CjZYjCrTw0}, {fldlHh3CjZYjCrTw0} >= NOW(), {fldlHh3CjZYjCrTw0} < DATEADD(DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-01')), 1, 'month')), 1, 0) + IF(AND({fldpsi4FlrSy0n9s3}, {fldpsi4FlrSy0n9s3} >= NOW(), {fldpsi4FlrSy0n9s3} < DATEADD(DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-01')), 1, 'month')), 1, 0) + IF(AND({fldZq3Pt77SRCxgPv}, {fldZq3Pt77SRCxgPv} >= NOW(), {fldZq3Pt77SRCxgPv} < DATEADD(DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-01')), 1, 'month')), 1, 0) + IF(AND({fldvpQO76KV8Pgpij}, {fldvpQO76KV8Pgpij} >= NOW(), {fldvpQO76KV8Pgpij} < DATEADD(DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-01')), 1, 'month')), 1, 0) )",
+    "sha": "5a5f65e543056506"
+  },
+  "Choirs › Rehearsals › Rehearsals to 15th": {
+    "base": "app5eEsU46HOwnLd2",
+    "table": "tbl8DgEG18XD7KVlS",
+    "id": "fldPqNIMntogbCn3d",
+    "type": "formula",
+    "formula": "( IF(AND({fld0ZLJt9yTVNT4qd}, {fld0ZLJt9yTVNT4qd} >= NOW(), {fld0ZLJt9yTVNT4qd} < IF(DAY(TODAY()) < 15, DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-15')), DATEADD(DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-15')), 1, 'month'))), 1, 0) + IF(AND({fldRUnHWYUKqzOr8b}, {fldRUnHWYUKqzOr8b} >= NOW(), {fldRUnHWYUKqzOr8b} < IF(DAY(TODAY()) < 15, DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-15')), DATEADD(DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-15')), 1, 'month'))), 1, 0) + IF(AND({fldPzv78Vxy4eugxs}, {fldPzv78Vxy4eugxs} >= NOW(), {fldPzv78Vxy4eugxs} < IF(DAY(TODAY()) < 15, DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-15')), DATEADD(DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-15')), 1, 'month'))), 1, 0) + IF(AND({fld4Wjytxg24GXttr}, {fld4Wjytxg24GXttr} >= NOW(), {fld4Wjytxg24GXttr} < IF(DAY(TODAY()) < 15, DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-15')), DATEADD(DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-15')), 1, 'month'))), 1, 0) + IF(AND({fldOVk5iqHeR2XwZz}, {fldOVk5iqHeR2XwZz} >= NOW(), {fldOVk5iqHeR2XwZz} < IF(DAY(TODAY()) < 15, DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-15')), DATEADD(DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-15')), 1, 'month'))), 1, 0) + IF(AND({fldIsLsKecIpp7KfJ}, {fldIsLsKecIpp7KfJ} >= NOW(), {fldIsLsKecIpp7KfJ} < IF(DAY(TODAY()) < 15, DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-15')), DATEADD(DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-15')), 1, 'month'))), 1, 0) + IF(AND({fldg3GC51gtsUbUt5}, {fldg3GC51gtsUbUt5} >= NOW(), {fldg3GC51gtsUbUt5} < IF(DAY(TODAY()) < 15, DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-15')), DATEADD(DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-15')), 1, 'month'))), 1, 0) + IF(AND({fldWLkpaLBihr5fjo}, {fldWLkpaLBihr5fjo} >= NOW(), {fldWLkpaLBihr5fjo} < IF(DAY(TODAY()) < 15, DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-15')), DATEADD(DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-15')), 1, 'month'))), 1, 0) + IF(AND({fldlHh3CjZYjCrTw0}, {fldlHh3CjZYjCrTw0} >= NOW(), {fldlHh3CjZYjCrTw0} < IF(DAY(TODAY()) < 15, DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-15')), DATEADD(DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-15')), 1, 'month'))), 1, 0) + IF(AND({fldpsi4FlrSy0n9s3}, {fldpsi4FlrSy0n9s3} >= NOW(), {fldpsi4FlrSy0n9s3} < IF(DAY(TODAY()) < 15, DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-15')), DATEADD(DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-15')), 1, 'month'))), 1, 0) + IF(AND({fldZq3Pt77SRCxgPv}, {fldZq3Pt77SRCxgPv} >= NOW(), {fldZq3Pt77SRCxgPv} < IF(DAY(TODAY()) < 15, DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-15')), DATEADD(DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-15')), 1, 'month'))), 1, 0) + IF(AND({fldvpQO76KV8Pgpij}, {fldvpQO76KV8Pgpij} >= NOW(), {fldvpQO76KV8Pgpij} < IF(DAY(TODAY()) < 15, DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-15')), DATEADD(DATETIME_PARSE(DATETIME_FORMAT(TODAY(), 'YYYY-MM-15')), 1, 'month'))), 1, 0) )",
+    "sha": "4a7c45a4ae86d4f4"
+  },
+  "Choirs › Rehearsals › Next Rehearsal Date": {
+    "base": "app5eEsU46HOwnLd2",
+    "table": "tbl8DgEG18XD7KVlS",
+    "id": "fldH8P1691lt51vVd",
+    "type": "formula",
+    "formula": "IF( {fldCknaWKuQ6BHeVT}, {fldCknaWKuQ6BHeVT}, IF( {fld0Wl4c7ourU8qU4} >= DATETIME_PARSE(DATETIME_FORMAT(NOW(),'YYYY-MM-DD')), {fld0Wl4c7ourU8qU4}, BLANK() ) )",
+    "sha": "7a24dd8cb14efee2"
+  }
+}
