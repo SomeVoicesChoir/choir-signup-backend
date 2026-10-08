@@ -1,6 +1,7 @@
 // create-subscription-first.js
 import Stripe from 'stripe';
 import Airtable from 'airtable';
+import { resolveDiscountCode } from '../../lib/discountCodes.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const app_url = process.env.APP_URL || 'https://choir-signup-backend-atuj.vercel.app';
@@ -239,39 +240,49 @@ export default async function handler(req, res) {
       },
     };
 
-    // Add discount if provided
+    // ── Apply the discount, via the SAME resolver the pre-check used.
+    //
+    // ⚠️ THIS USED TO FAIL SILENTLY, AND THAT WAS THE WHOLE BUG. The old block
+    // tried coupons.retrieve() first, then promotionCodes.list({ limit: 1 }),
+    // and swallowed every failure — so a code that didn't resolve meant the
+    // member was charged FULL PRICE with no error raised anywhere, on any
+    // surface. And because the pre-check consulted AIRTABLE rather than Stripe,
+    // a code could pass validation and arrive here with nothing to apply: 2 of
+    // the 35 Airtable rows were in exactly that state on 8 Oct 2026.
+    //
+    // Three things change:
+    //   · ONE resolver shared with check-discount-code, so a code that
+    //     validates is a code that applies.
+    //   · PROMOTION CODES FIRST, so their single-use cap and expiry can't be
+    //     bypassed by typing the underlying coupon's id instead.
+    //   · ALL duplicate matches considered, not data[0] — the live account has
+    //     25OXFORDFIRSTTERM three times and 50GARRYWALTONCOUPON twice, so
+    //     "which one did Stripe return" decided whether a code worked.
+    //
+    // ⚠️ IT REFUSES THE SIGNUP rather than quietly charging full price, and that
+    // is a deliberate decision (confirmed 8 Oct 2026), including when Stripe
+    // itself is unreachable. "Try again in a moment" is recoverable; an
+    // unexpected full charge on a membership somebody was promised free is not,
+    // and it is invisible to us — the member just sees money leave. Every
+    // refusal tells them to email sing@ if they think it's wrong, and they can
+    // always clear the code and continue deliberately.
+    //
+    // The cost, accepted: a Stripe outage blocks a signup that carries a code.
+    // Signups without one are unaffected.
     if (discountCode) {
-      try {
-        // First try to retrieve as a coupon
-        const coupon = await stripe.coupons.retrieve(discountCode);
-        if (coupon) {
-          sessionConfig.discounts = [{ coupon: discountCode }];
-          console.log('Applied coupon to checkout:', discountCode);
-        }
-      } catch (couponError) {
-        try {
-          // If coupon fails, try as promotion code
-          const promotionCodes = await stripe.promotionCodes.list({
-            code: discountCode,
-            limit: 1
-          });
-          
-          if (promotionCodes.data.length > 0) {
-            const promotionCode = promotionCodes.data[0];
-            if (promotionCode.active) {
-              sessionConfig.discounts = [{ promotion_code: promotionCode.id }];
-              console.log('Applied promotion code to checkout:', promotionCode.id);
-            } else {
-              console.log('Promotion code is inactive:', discountCode);
-            }
-          } else {
-            console.log('No valid discount found for code:', discountCode);
-          }
-        } catch (promoError) {
-          console.error('Error applying discount to checkout:', promoError.message);
-          // Don't throw error, just continue without discount
-        }
+      const resolved = await resolveDiscountCode(discountCode);
+      if (!resolved.ok) {
+        return res.status(400).json({
+          error: resolved.message || 'That discount code is not valid.',
+          code: 'DISCOUNT_NOT_APPLICABLE',
+          reason: resolved.reason,
+        });
       }
+      // `resolved.discount` is already in the shape Checkout wants —
+      // { promotion_code } or { coupon } — so there is no second place where
+      // the choice between them could be got wrong.
+      sessionConfig.discounts = [resolved.discount];
+      console.log(`Applied ${resolved.kind} to checkout: ${resolved.code} (${resolved.describe})`);
     }
 
     console.log('Creating Stripe Checkout session with config:', sessionConfig);
