@@ -6,11 +6,12 @@
   "license": "ISC",
   "scripts": {
     "dev": "next dev",
-    "prebuild": "npm run check:billing",
+    "prebuild": "npm run check:billing && npm run check:firstcharge",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "check:billing": "node scripts/check-billing-formulas.mjs"
+    "check:billing": "node scripts/check-billing-formulas.mjs",
+    "check:firstcharge": "TZ=UTC node scripts/check-first-charge.mjs"
   },
   "dependencies": {
     "airtable": "^0.12.2",

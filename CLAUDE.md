@@ -146,6 +146,34 @@ getBillingAnchorTimestamp() [CODE]      ← Calculates the trial_end timestamp
                                           If still < 48hrs → +1 more month
 ```
 
+### First charge is never before the term starts billing (Nov 2026)
+
+`getBillingAnchorTimestamp()` is now `legacyFirstCharge()` in **`lib/firstCharge.js`**, moved
+unchanged, and both subscription endpoints call **`firstChargeFor()`**: `trial_end` is the LATER
+of the legacy answer and **`{First Term Anchor}`** (Signup Queue) — the 1st/15th of week 1's month,
+May for an April week 1. It only ever wins for a choir that hasn't started its term (a new choir
+opened ahead of launch, or a between-terms joiner): 14 of 2,261 signups in the year to Oct 2026,
+each charged a month before their choir had a rehearsal.
+
+- ⚠️ **A due charge never moves into next month.** The deferral lands exactly ON the anchor,
+  and whenever the anchor isn't later, the legacy timestamp is returned to the second. Policy:
+  *"It's better to refund people, than ask for money later that should have been taken."*
+- **`{First Term Anchor}` is a verbatim copy of tier 3's DATEADD** — so the up-front charge
+  ("before the term: activation fee only") and the first monthly charge use one date. Enforced
+  by `check:billing` (`SAME_EXPRESSION`); a blank/malformed anchor means no deferral.
+- **`npm run check:firstcharge`** (on `prebuild`, TZ=UTC): ~47M checks — legacy identical to a
+  frozen copy of the original; nothing changes mid-term; deferral exactly on the anchor; ≥48h;
+  and a mirror of the Airtable tiers proving a deferral only ever follows tier 3 (activation
+  only) or tier 2 (a full month up front — a PRE-EXISTING one-month over-charge, see below).
+- **Repeating discounts** are counted by Stripe from signup, so a deferral would eat them. The
+  backend stamps `metadata.deferredMonths`; sv-app's `/api/cron/deferred-discounts`
+  (`DEFERRED_DISCOUNT_EXTEND_ENABLED`) restores exactly the same number of discounted charges.
+  Not done here: `stripe-webhook.js` is NOT registered in Stripe (only Zapier's are).
+- ⚠️ **Known, pre-existing, not fixed:** tier 2 (`Will Push`) sits above tier 3, so a signup within
+  2 days of a 1st/15th at a choir whose term bills a month or more later pays a full month up
+  front it doesn't owe. The legacy code then charged a further month on top; the deferral
+  removes that second one. Removing the first is an Airtable formula change.
+
 **The golden rule:** Both paths must agree. If the code pushes the first invoice further out, Airtable must charge enough in the initial payment to cover that period. The `< 3` day threshold in Airtable and the 48-hour check in code are aligned to ensure this.
 
 ### The 48-Hour Edge Case (Fixed April 2026)

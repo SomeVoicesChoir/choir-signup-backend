@@ -60,6 +60,9 @@ const GUARDED = [
       'Days Until Billing',
       'Next Billing Date (Before Push)',
       'Next Rehearsal Date',
+      // Read by create-subscription-first (lib/firstCharge.js): the first monthly charge is
+      // never earlier than this. Must equal tier 3's own date — see SAME_EXPRESSION below.
+      'First Term Anchor',
     ],
   },
   {
@@ -160,6 +163,30 @@ const INVARIANTS = [
   }),
 ];
 
+/**
+ * Two formulas that must compute the SAME date, by the same text.
+ *
+ * Tier 3 of the multiplier charges only the activation fee when TODAY is before the term's first
+ * billing date, on the promise that the monthly charges will start on that date. The code keeps
+ * that promise by reading {First Term Anchor}. If the two expressions ever drift, Airtable and
+ * Stripe disagree about when billing starts: a free month one way, a double charge the other.
+ * So the first DATEADD(…) in each must be character-for-character identical (whitespace aside).
+ */
+const SAME_EXPRESSION = [
+  {
+    a: 'SV Membership Base › Signup Queue › Billing Anchor Rehearsals Left Multiplier',
+    b: 'SV Membership Base › Signup Queue › First Term Anchor',
+    extract: (f) => {
+      const start = f.indexOf('DATEADD(');
+      if (start === -1) return null;
+      let i = start + 'DATEADD('.length, depth = 1;
+      while (depth && i < f.length) { depth += (f[i] === '(') - (f[i] === ')'); i++; }
+      return depth ? null : f.slice(start, i).replace(/\s+/g, '');
+    },
+    name: 'tier 3\'s first-term-anchor date and {First Term Anchor} are the same expression',
+  },
+];
+
 const normalise = (s) => String(s).replace(/\s+/g, ' ').trim();
 const digest = (s) => crypto.createHash('sha256').update(s).digest('hex').slice(0, 16);
 
@@ -247,10 +274,25 @@ async function main() {
 
   const { snapshot, nameOf, missing } = snapshotOf(groups);
 
-  const brokenInvariants = (snap) => INVARIANTS.filter((inv) => {
-    const f = snap[inv.key]?.formula;
-    return f ? !inv.test(withNames(f, nameOf[inv.key])) : false;
-  });
+  const brokenInvariants = (snap) => [
+    ...INVARIANTS.filter((inv) => {
+      const f = snap[inv.key]?.formula;
+      return f ? !inv.test(withNames(f, nameOf[inv.key])) : false;
+    }),
+    // Compared on raw field IDS, so a rename can't make two identical expressions look different.
+    ...SAME_EXPRESSION.filter((s) => {
+      const fa = snap[s.a]?.formula, fb = snap[s.b]?.formula;
+      if (!fa || !fb) return false; // a missing field is reported as missing, not twice
+      const ea = s.extract(fa), eb = s.extract(fb);
+      return !ea || ea !== eb;
+    }).map((s) => ({
+      key: s.b, name: s.name,
+      why: 'Tier 3 charges only the activation fee on the promise that monthly charges start on the '
+         + 'term\'s first billing date; the code reads {First Term Anchor} to keep that promise. Two '
+         + 'different expressions means Airtable and Stripe disagree about when billing starts. '
+         + 'Copy tier 3\'s DATEADD(…) into {First Term Anchor} verbatim.',
+    })),
+  ];
 
   if (update) {
     const broken = brokenInvariants(snapshot);

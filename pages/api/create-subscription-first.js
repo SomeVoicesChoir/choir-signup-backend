@@ -2,35 +2,11 @@
 import Stripe from 'stripe';
 import Airtable from 'airtable';
 import { resolveDiscountCode } from '../../lib/discountCodes.js';
+import { firstChargeFor } from '../../lib/firstCharge.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const app_url = process.env.APP_URL || 'https://choir-signup-backend-atuj.vercel.app';
 const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);
-
-function getBillingAnchorTimestamp(billing_date, skipNextMonth) {
-  const now = new Date();
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
-  const currentDay = now.getDate();
-  
-  // Parse billing_date (expecting format like "1st" or "15th" or just "1" or "15")
-  const dayOfMonth = parseInt(billing_date.replace(/\D/g, ''));
-  let billingDate;
-  // if the billing date is passed then change the month
-  if (currentDay > dayOfMonth || currentDay === dayOfMonth || skipNextMonth === 'Yes') {
-      billingDate = new Date(currentYear, currentMonth + 1, dayOfMonth);
-  } else {
-      billingDate = new Date(currentYear, currentMonth, dayOfMonth);
-  }
-  // Stripe requires trial_end to be at least 48 hours in the future.
-  // If the anchor is too close, push to next month.
-  const minTrialEnd = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-  if (billingDate < minTrialEnd) {
-    billingDate = new Date(billingDate.getFullYear(), billingDate.getMonth() + 1, dayOfMonth);
-  }
-
-  return Math.floor(billingDate.getTime() / 1000);
-}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -172,8 +148,20 @@ export default async function handler(req, res) {
 
     // Compute trial_end once and format a human-readable date string for customer-facing messaging.
     // The "trial" here is Stripe's mechanism for delaying the first subscription invoice to the
-    // customer's billing anchor — not a complimentary period.
-    const trialEnd = getBillingAnchorTimestamp(billing_date, skipNextMonth);
+    // customer's billing anchor — not a complimentary period. Never earlier than the term's first
+    // billing date, never later than the legacy answer otherwise — see lib/firstCharge.js.
+    const { trialEnd, legacy: legacyTrialEnd, deferredMonths } = firstChargeFor({
+      billingDate: billing_date,
+      skipNextMonth,
+      firstTermAnchor: record.fields['First Term Anchor'],
+    });
+    if (deferredMonths > 0) {
+      console.log(`First charge deferred ${deferredMonths} month(s) to the term's first billing date:`,
+        new Date(legacyTrialEnd * 1000).toISOString(), '→', new Date(trialEnd * 1000).toISOString());
+    }
+    // The webhook reads this to extend a REPEATING discount by the same number of months —
+    // Stripe counts a repeating coupon's months from signup, not from the first charge.
+    metadata.deferredMonths = String(deferredMonths);
     const trialEndDate = new Date(trialEnd * 1000);
     const trialEndReadable = trialEndDate.toLocaleDateString('en-GB', {
       day: 'numeric',

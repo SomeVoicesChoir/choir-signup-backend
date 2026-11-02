@@ -1,29 +1,25 @@
 import Stripe from 'stripe';
-import Airtable from 'airtable';const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);function getBillingAnchorTimestamp(billing_date, skipNextMonth) {
-  const now = new Date();
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
-  const currentDay = now.getDate();
-  
-  // Parse billing_date (expecting format like "1st" or "15th" or just "1" or "15")
-  const dayOfMonth = parseInt(billing_date.replace(/\D/g, ''));
-  let billingDate;
-  // if the billing date is passed then change the month
-  if (currentDay > dayOfMonth || currentDay === dayOfMonth || skipNextMonth === 'Yes') {
-      billingDate = new Date(currentYear, currentMonth + 1, dayOfMonth);
-  }else {
-      billingDate = new Date(currentYear, currentMonth, dayOfMonth);
-  }
-  // Stripe requires trial_end to be at least 48 hours in the future.
-  // If the anchor is too close, push to next month.
-  const minTrialEnd = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-  if (billingDate < minTrialEnd) {
-    billingDate = new Date(billingDate.getFullYear(), billingDate.getMonth() + 1, dayOfMonth);
-  }
+import Airtable from 'airtable';
+import { firstChargeFor } from '../../lib/firstCharge.js';
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);
 
-  return Math.floor(billingDate.getTime() / 1000);
-}export default async function handler(req, res) {
+// ⚠️ No live traffic: all 1,370 trialled subscriptions from Apr–Oct 2026 came through
+// create-subscription-first's Checkout. Kept on the shared first-charge rule anyway, so a
+// revived path cannot quietly charge before the term starts.
+async function firstTermAnchorFor(recordId) {
+  if (!recordId) return null;
+  try {
+    const record = await base('Signup Queue').find(recordId);
+    return record.fields['First Term Anchor'] || null;
+  } catch (err) {
+    // Fails to the legacy date (no deferral) — never to a later one.
+    console.error('Could not read First Term Anchor (using legacy date):', err.message);
+    return null;
+  }
+}
+
+export default async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -49,7 +45,19 @@ const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process
           default_payment_method: paymentMethodId
         }
       });
-    }    // For subscription, use a different approach if payment was via iDEAL
+    }
+    const { trialEnd, deferredMonths } = firstChargeFor({
+      billingDate: billing_date,
+      skipNextMonth,
+      firstTermAnchor: await firstTermAnchorFor(recordId),
+    });
+    if (deferredMonths > 0) {
+      // This path applies the coupon straight onto the subscription, so a REPEATING discount
+      // would lose `deferredMonths` of its free months (Stripe counts from now). Logged rather
+      // than handled because the path carries no traffic — handle it before reviving it.
+      console.warn(`[first-charge] deferred ${deferredMonths} month(s) on the unused iDEAL path; a repeating discount is NOT extended here`);
+    }
+    // For subscription, use a different approach if payment was via iDEAL
     let subscriptionData = {
       customer: customerId,
       items: [{ price: priceId }],
@@ -60,7 +68,7 @@ const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process
       // Set billing anchor to charge on specific date it would be 1 or 15 of next month
       // billing_cycle_anchor: getBillingAnchorTimestamp(billing_date, skipNextMonth),
       // set the trial period to 0
-      trial_end: getBillingAnchorTimestamp(billing_date, skipNextMonth),
+      trial_end: trialEnd,
       proration_behavior: 'none', // Don't prorate the first invoice
       automatic_tax: { enabled: true },
       metadata: {

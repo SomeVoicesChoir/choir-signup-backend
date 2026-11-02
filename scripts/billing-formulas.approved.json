@@ -71,6 +71,14 @@
     "formula": "IF( AND( {fldFa27gNdDPSxsrB} != \"\", {fldFa27gNdDPSxsrB} != \"Not yet booked\" ), DATETIME_FORMAT( DATETIME_PARSE(ARRAYJOIN({fldFa27gNdDPSxsrB}, \"\")), \"YYYY-MM-DD\" ), \"\" )",
     "sha": "7ed2d57d5f4f32bc"
   },
+  "SV Membership Base › Signup Queue › First Term Anchor": {
+    "base": "appgeAZX8ydvde5th",
+    "table": "tblNHlZ2u3C65XuW7",
+    "id": "fldLeRr3AuIPZRvDU",
+    "type": "formula",
+    "formula": "IF( OR( {fldISHm4zAgiYgIYy} = \"\", {fldISHm4zAgiYgIYy} = BLANK() ), \"\", DATETIME_FORMAT( DATEADD( DATETIME_PARSE( DATETIME_FORMAT( DATETIME_PARSE(ARRAYJOIN({fldISHm4zAgiYgIYy}, \"\"), 'M/D/YYYY HH:mm'), IF({fldBP82yfJVR0zlEn} = \"1\", 'YYYY-MM-01', 'YYYY-MM-15') ), 'YYYY-MM-DD' ), IF(MONTH(DATETIME_PARSE(ARRAYJOIN({fldISHm4zAgiYgIYy}, \"\"), 'M/D/YYYY HH:mm')) = 4, 1, 0), 'months' ), 'YYYY-MM-DD' ) )",
+    "sha": "a6a3722c2e2d2acc"
+  },
   "Choirs › Rehearsals › Rehearsals to 1st": {
     "base": "app5eEsU46HOwnLd2",
     "table": "tbl8DgEG18XD7KVlS",
